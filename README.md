@@ -1,11 +1,10 @@
 
   # Food Delivery Website Design
 
-  This is a code bundle for Food Delivery Website Design. The original project is available at https://www.figma.com/design/7daSdgGZgpZ0nxIsUb4mv0/Food-Delivery-Website-Design.
+  This is a code bundle for Food Delivery Website Design. This project was made by Michael Llanes, Camryn McPhaul, and Inzwi Zunga.
 
   ## Running the code
 
-  Run `npm i` to install the dependencies.
+  Make sure you have Node.js installed.
 
   Run `npm run dev` to start the development server.
-  
