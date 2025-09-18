@@ -6,15 +6,15 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
 import { Progress } from './ui/progress';
-import { 
-  ArrowRight, 
-  ArrowLeft, 
-  Check, 
-  Upload, 
-  MapPin, 
-  Phone, 
-  Mail, 
-  Clock, 
+import {
+  ArrowRight,
+  ArrowLeft,
+  Check,
+  Upload,
+  MapPin,
+  Phone,
+  Mail,
+  Clock,
   DollarSign,
   Camera,
   Plus,
@@ -37,7 +37,7 @@ const steps = [
 ];
 
 const cuisineTypes = [
-  'Italian', 'Chinese', 'Mexican', 'Indian', 'Japanese', 'Thai', 'American', 
+  'Italian', 'Chinese', 'Mexican', 'Indian', 'Japanese', 'Thai', 'American',
   'Mediterranean', 'French', 'Korean', 'Vietnamese', 'Pizza', 'Burgers', 'Seafood'
 ];
 
@@ -49,7 +49,7 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
     description: '',
     cuisineType: '',
     establishedYear: '',
-    
+
     // Location & Contact
     address: '',
     city: '',
@@ -58,7 +58,7 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
     phone: '',
     email: '',
     website: '',
-    
+
     // Menu & Operations
     averagePrice: '',
     deliveryFee: '',
@@ -73,13 +73,15 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
       saturday: { open: '', close: '', closed: false },
       sunday: { open: '', close: '', closed: false }
     },
-    
+
     // Business Info
     businessLicense: '',
     taxId: '',
     ownerName: '',
     bankAccount: ''
   });
+
+  const [errors, setErrors] = useState<{ [key: string]: any }>({});
 
   const [menuItems, setMenuItems] = useState([
     { name: '', description: '', price: '', category: '', image: null }
@@ -98,14 +100,60 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
   };
 
   const updateMenuItem = (index: number, field: string, value: string) => {
-    setMenuItems(prev => prev.map((item, i) => 
+    setMenuItems(prev => prev.map((item, i) =>
       i === index ? { ...item, [field]: value } : item
     ));
   };
 
+  const validateStep = () => {
+    // Basic validation for required fields in each step
+    const newErrors: { [key: string]: any } = {};
+    if (currentStep === 1) {
+      if (!formData.restaurantName) newErrors.restaurantName = 'Restaurant name is required';
+      if (!formData.description) newErrors.description = 'Description is required';
+      if (!formData.cuisineType) newErrors.cuisineType = 'Cuisine type is required';
+    } else if (currentStep === 2) {
+      if (!formData.address) newErrors.address = 'Address is required';
+      if (!formData.city) newErrors.city = 'City is required';
+      if (!formData.state) newErrors.state = 'State is required';
+      if (!formData.zipCode) newErrors.zipCode = 'ZIP code is required';
+      if (!formData.phone) newErrors.phone = 'Phone number is required';
+      if (!formData.email) newErrors.email = 'Email address is required';
+    } else if (currentStep === 3) {
+      if (!formData.averagePrice) newErrors.averagePrice = 'Average price range is required';
+      if (!formData.deliveryFee) newErrors.deliveryFee = 'Delivery fee is required';
+      if (!formData.minimumOrder) newErrors.minimumOrder = 'Minimum order amount is required';
+      if (!formData.preparationTime) newErrors.preparationTime = 'Preparation time is required';
+      // Validate menu items
+      const menuErrors: { [index: number]: { [field: string]: string } } = {};
+      menuItems.forEach((item, idx) => {
+        const itemErrors: { [field: string]: string } = {};
+        if (!item.name) itemErrors.name = 'Name is required';
+        if (!item.price) itemErrors.price = 'Price is required';
+        if (!item.description) itemErrors.description = 'Description is required';
+        if (Object.keys(itemErrors).length > 0) {
+          menuErrors[idx] = itemErrors;
+        }
+      });
+      if (Object.keys(menuErrors).length > 0) {
+        newErrors.menuItems = menuErrors;
+      }
+    } else if (currentStep === 4) {
+      if (!formData.businessLicense) newErrors.businessLicense = 'Business license number is required';
+      if (!formData.taxId) newErrors.taxId = 'Tax ID is required';
+      if (!formData.ownerName) newErrors.ownerName = 'Owner name is required';
+    } else if (currentStep === 5) {
+      // Final review step - ensure terms are accepted (if applicable), no validation needed
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const nextStep = () => {
-    if (currentStep < steps.length) {
-      setCurrentStep(currentStep + 1);
+    if (validateStep()) {
+      if (currentStep < steps.length) {
+        setCurrentStep(currentStep + 1);
+      }
     }
   };
 
@@ -129,25 +177,27 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
                   placeholder="Enter your restaurant name"
                   value={formData.restaurantName}
                   onChange={(e) => updateFormData('restaurantName', e.target.value)}
-                  className="bg-card/50 border-white/10"
+                  className={`bg-card/50 border-white/10 ${errors.restaurantName ? 'border-destructive' : ''}`}
                 />
+                {errors.restaurantName && <p className="text-xs text-destructive mt-1">{errors.restaurantName}</p>}
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium mb-2">Description *</label>
                 <Textarea
                   placeholder="Describe your restaurant, specialties, and what makes you unique..."
                   value={formData.description}
                   onChange={(e) => updateFormData('description', e.target.value)}
-                  className="bg-card/50 border-white/10 min-h-[100px]"
+                  className={`bg-card/50 border-white/10 min-h-[100px] ${errors.description ? 'border-destructive' : ''}`}
                 />
+                {errors.description && <p className="text-xs text-destructive mt-1">{errors.description}</p>}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">Cuisine Type *</label>
                   <Select value={formData.cuisineType} onValueChange={(value) => updateFormData('cuisineType', value)}>
-                    <SelectTrigger className="bg-card/50 border-white/10">
+                    <SelectTrigger className={`bg-card/50 border-white/10 ${errors.cuisineType ? 'border-destructive' : ''}`}>
                       <SelectValue placeholder="Select cuisine type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -156,8 +206,9 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
                       ))}
                     </SelectContent>
                   </Select>
+                  {errors.cuisineType && <p className="text-xs text-destructive mt-1">{errors.cuisineType}</p>}
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium mb-2">Established Year</label>
                   <Input
@@ -191,8 +242,9 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
                   placeholder="123 Main Street"
                   value={formData.address}
                   onChange={(e) => updateFormData('address', e.target.value)}
-                  className="bg-card/50 border-white/10"
+                  className={`bg-card/50 border-white/10 ${errors.address ? 'border-destructive' : ''}`}
                 />
+                {errors.address && <p className="text-xs text-destructive mt-1">{errors.address}</p>}
               </div>
 
               <div className="grid grid-cols-3 gap-4">
@@ -202,8 +254,9 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
                     placeholder="New York"
                     value={formData.city}
                     onChange={(e) => updateFormData('city', e.target.value)}
-                    className="bg-card/50 border-white/10"
+                    className={`bg-card/50 border-white/10 ${errors.city ? 'border-destructive' : ''}`}
                   />
+                  {errors.city && <p className="text-xs text-destructive mt-1">{errors.city}</p>}
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2">State *</label>
@@ -211,8 +264,9 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
                     placeholder="NY"
                     value={formData.state}
                     onChange={(e) => updateFormData('state', e.target.value)}
-                    className="bg-card/50 border-white/10"
+                    className={`bg-card/50 border-white/10 ${errors.state ? 'border-destructive' : ''}`}
                   />
+                  {errors.state && <p className="text-xs text-destructive mt-1">{errors.state}</p>}
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2">ZIP Code *</label>
@@ -220,8 +274,9 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
                     placeholder="10001"
                     value={formData.zipCode}
                     onChange={(e) => updateFormData('zipCode', e.target.value)}
-                    className="bg-card/50 border-white/10"
+                    className={`bg-card/50 border-white/10 ${errors.zipCode ? 'border-destructive' : ''}`}
                   />
+                  {errors.zipCode && <p className="text-xs text-destructive mt-1">{errors.zipCode}</p>}
                 </div>
               </div>
 
@@ -234,8 +289,9 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
                     placeholder="(555) 123-4567"
                     value={formData.phone}
                     onChange={(e) => updateFormData('phone', e.target.value)}
-                    className="bg-card/50 border-white/10"
+                    className={`bg-card/50 border-white/10 ${errors.phone ? 'border-destructive' : ''}`}
                   />
+                  {errors.phone && <p className="text-xs text-destructive mt-1">{errors.phone}</p>}
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2">Email Address *</label>
@@ -243,8 +299,9 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
                     placeholder="restaurant@example.com"
                     value={formData.email}
                     onChange={(e) => updateFormData('email', e.target.value)}
-                    className="bg-card/50 border-white/10"
+                    className={`bg-card/50 border-white/10 ${errors.email ? 'border-destructive' : ''}`}
                   />
+                  {errors.email && <p className="text-xs text-destructive mt-1">{errors.email}</p>}
                 </div>
               </div>
 
@@ -271,7 +328,7 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
                       <div className="w-20">
                         <span className="text-sm font-medium capitalize">{day}</span>
                       </div>
-                      
+
                       <div className="flex items-center space-x-2">
                         <Checkbox
                           id={`${day}-closed`}
@@ -316,7 +373,7 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
                               </SelectContent>
                             </Select>
                           </div>
-                          
+
                           <div className="flex items-center space-x-2">
                             <span className="text-sm text-muted-foreground">Close:</span>
                             <Select
@@ -345,7 +402,7 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
                     </div>
                   ))}
                 </div>
-                
+
                 <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
                   <p className="text-sm text-blue-400">
                     💡 Tip: Set accurate hours so customers know when they can order from you. You can always update these later in your dashboard.
@@ -363,7 +420,7 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
               <div>
                 <label className="block text-sm font-medium mb-2">Average Price Range *</label>
                 <Select value={formData.averagePrice} onValueChange={(value) => updateFormData('averagePrice', value)}>
-                  <SelectTrigger className="bg-card/50 border-white/10">
+                  <SelectTrigger className={`bg-card/50 border-white/10 ${errors.averagePrice ? 'border-destructive' : ''}`}>
                     <SelectValue placeholder="Select price range" />
                   </SelectTrigger>
                   <SelectContent>
@@ -373,16 +430,18 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
                     <SelectItem value="$$$$">$$$$ ($50+)</SelectItem>
                   </SelectContent>
                 </Select>
+                {errors.averagePrice && <p className="text-xs text-destructive mt-1">{errors.averagePrice}</p>}
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium mb-2">Delivery Fee *</label>
                 <Input
                   placeholder="2.99"
                   value={formData.deliveryFee}
                   onChange={(e) => updateFormData('deliveryFee', e.target.value)}
-                  className="bg-card/50 border-white/10"
+                  className={`bg-card/50 border-white/10 ${errors.deliveryFee ? 'border-destructive' : ''}`}
                 />
+                {errors.deliveryFee && <p className="text-xs text-destructive mt-1">{errors.deliveryFee}</p>}
               </div>
             </div>
 
@@ -393,18 +452,20 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
                   placeholder="15.00"
                   value={formData.minimumOrder}
                   onChange={(e) => updateFormData('minimumOrder', e.target.value)}
-                  className="bg-card/50 border-white/10"
+                  className={`bg-card/50 border-white/10 ${errors.minimumOrder ? 'border-destructive' : ''}`}
                 />
+                {errors.minimumOrder && <p className="text-xs text-destructive mt-1">{errors.minimumOrder}</p>}
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium mb-2">Avg. Preparation Time (min) *</label>
                 <Input
                   placeholder="25"
                   value={formData.preparationTime}
                   onChange={(e) => updateFormData('preparationTime', e.target.value)}
-                  className="bg-card/50 border-white/10"
+                  className={`bg-card/50 border-white/10 ${errors.preparationTime ? 'border-destructive' : ''}`}
                 />
+                {errors.preparationTime && <p className="text-xs text-destructive mt-1">{errors.preparationTime}</p>}
               </div>
             </div>
 
@@ -429,38 +490,47 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
                           </Button>
                         )}
                       </div>
-                      
+
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <Input
                             placeholder="Item name"
                             value={item.name}
                             onChange={(e) => updateMenuItem(index, 'name', e.target.value)}
-                            className="bg-background/50 border-white/10"
+                            className={`bg-background/50 border-white/10 ${errors.menuItems && errors.menuItems[index]?.name ? 'border-destructive' : ''}`}
                           />
+                          {errors.menuItems && errors.menuItems[index]?.name && (
+                            <p className="text-xs text-destructive mt-1">{errors.menuItems[index].name}</p>
+                          )}
                         </div>
                         <div>
                           <Input
                             placeholder="Price (e.g., 12.99)"
                             value={item.price}
                             onChange={(e) => updateMenuItem(index, 'price', e.target.value)}
-                            className="bg-background/50 border-white/10"
+                            className={`bg-background/50 border-white/10 ${errors.menuItems && errors.menuItems[index]?.price ? 'border-destructive' : ''}`}
                           />
+                          {errors.menuItems && errors.menuItems[index]?.price && (
+                            <p className="text-xs text-destructive mt-1">{errors.menuItems[index].price}</p>
+                          )}
                         </div>
                       </div>
-                      
+
                       <div className="mt-4">
                         <Textarea
                           placeholder="Item description"
                           value={item.description}
                           onChange={(e) => updateMenuItem(index, 'description', e.target.value)}
-                          className="bg-background/50 border-white/10"
+                          className={`bg-background/50 border-white/10 ${errors.menuItems && errors.menuItems[index]?.description ? 'border-destructive' : ''}`}
                         />
+                        {errors.menuItems && errors.menuItems[index]?.description && (
+                          <p className="text-xs text-destructive mt-1">{errors.menuItems[index].description}</p>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
                 ))}
-                
+
                 <Button
                   variant="outline"
                   onClick={addMenuItem}
@@ -484,8 +554,9 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
                   placeholder="Enter your business license number"
                   value={formData.businessLicense}
                   onChange={(e) => updateFormData('businessLicense', e.target.value)}
-                  className="bg-card/50 border-white/10"
+                  className={`bg-card/50 border-white/10 ${errors.businessLicense ? 'border-destructive' : ''}`}
                 />
+                {errors.businessLicense && <p className="text-xs text-destructive mt-1">{errors.businessLicense}</p>}
               </div>
 
               <div>
@@ -494,8 +565,9 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
                   placeholder="XX-XXXXXXX"
                   value={formData.taxId}
                   onChange={(e) => updateFormData('taxId', e.target.value)}
-                  className="bg-card/50 border-white/10"
+                  className={`bg-card/50 border-white/10 ${errors.taxId ? 'border-destructive' : ''}`}
                 />
+                {errors.taxId && <p className="text-xs text-destructive mt-1">{errors.taxId}</p>}
               </div>
 
               <div>
@@ -504,8 +576,9 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
                   placeholder="Full name of business owner"
                   value={formData.ownerName}
                   onChange={(e) => updateFormData('ownerName', e.target.value)}
-                  className="bg-card/50 border-white/10"
+                  className={`bg-card/50 border-white/10 ${errors.ownerName ? 'border-destructive' : ''}`}
                 />
+                {errors.ownerName && <p className="text-xs text-destructive mt-1">{errors.ownerName}</p>}
               </div>
 
               <Separator className="bg-white/10" />
@@ -518,7 +591,7 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
                     <p className="text-sm text-muted-foreground">Upload Business License</p>
                     <p className="text-xs text-muted-foreground">PDF, JPG, PNG up to 5MB</p>
                   </div>
-                  
+
                   <div className="border-2 border-dashed border-white/20 rounded-lg p-6 text-center hover:border-primary/50 transition-colors cursor-pointer">
                     <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                     <p className="text-sm text-muted-foreground">Upload Food Handler's Permit</p>
@@ -577,10 +650,10 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
                     <div key={day} className="flex justify-between items-center py-1">
                       <span className="text-sm font-medium capitalize">{day}:</span>
                       <span className="text-sm text-muted-foreground">
-                        {hours.closed 
-                          ? 'Closed' 
-                          : hours.open && hours.close 
-                            ? `${hours.open} - ${hours.close}` 
+                        {hours.closed
+                          ? 'Closed'
+                          : hours.open && hours.close
+                            ? `${hours.open} - ${hours.close}`
                             : 'Not set'
                         }
                       </span>
@@ -649,11 +722,10 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
             <div className="grid grid-cols-5 gap-4">
               {steps.map((step) => (
                 <div key={step.id} className="text-center">
-                  <div className={`w-8 h-8 rounded-full mx-auto mb-2 flex items-center justify-center text-sm font-medium ${
-                    step.id <= currentStep 
-                      ? 'bg-primary text-primary-foreground' 
+                  <div className={`w-8 h-8 rounded-full mx-auto mb-2 flex items-center justify-center text-sm font-medium ${step.id <= currentStep
+                      ? 'bg-primary text-primary-foreground'
                       : 'bg-muted text-muted-foreground'
-                  }`}>
+                    }`}>
                     {step.id < currentStep ? <Check className="h-4 w-4" /> : step.id}
                   </div>
                   <p className="text-xs text-muted-foreground">{step.title}</p>
@@ -684,7 +756,7 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
               <ArrowLeft className="h-4 w-4 mr-2" />
               Previous
             </Button>
-            
+
             {currentStep === steps.length ? (
               <Button onClick={() => onComplete(formData)} className="bg-primary hover:bg-primary/80">
                 Submit Application
