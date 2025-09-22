@@ -497,7 +497,7 @@ export default function AllRestaurants({ onBack, onRestaurantSelect, onRestauran
                       ? 'opacity-60 grayscale hover:scale-100' 
                       : 'hover:scale-105'
                   } bg-card/40 backdrop-blur-sm border-white/10 hover:border-primary/30 overflow-hidden`}
-                  onClick={() => onRestaurantSelect(restaurant)}
+                  {...(!isClosed && { onClick: () => onRestaurantSelect(restaurant) })}
                 >
                   <div className="relative">
                     <div className="aspect-video bg-gradient-to-br from-muted/20 to-muted/5 relative overflow-hidden">

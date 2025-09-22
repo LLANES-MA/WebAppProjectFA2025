@@ -19,7 +19,7 @@ interface SignInProps {
 }
 
 export default function SignIn({ onBack, onSignInSuccess, onGoToAdmin, onGoToStaff, onGoToRestaurantDashboard, onGoToAdminSignIn, onGoToStaffSignIn, onGoToRestaurantSignIn, targetUserType = 'customer' }: SignInProps) {
-  const [signInForm, setSignInForm] = useState({ email: '', password: '' });
+  const [signInForm, setSignInForm] = useState({ username: '', password: '' });
   const [signUpForm, setSignUpForm] = useState({ 
     name: '', 
     email: '', 
@@ -30,11 +30,33 @@ export default function SignIn({ onBack, onSignInSuccess, onGoToAdmin, onGoToSta
     restaurantCode: ''
   });
   const [activeTab, setActiveTab] = useState('signin');
+  const [errors, setErrors] = useState<{[key: string]: string}>({});
 
+  // Username validation: min 2 chars + 2 digits (except admin)
+  function validateUsername(username: string, isAdmin: boolean) {
+    if (isAdmin) return '';
+    if (!/^[A-Za-z]{2,}\d{2,}$/.test(username)) {
+      return 'Username must have at least 2 letters followed by at least 2 digits';
+    }
+    return '';
+  }
 
+  // Password validation: min 6 chars, 1 upper, 1 lower, 1 number
+  function validatePassword(password: string) {
+    if (password.length < 6) return 'Password must be at least 6 characters';
+    if (!/[A-Z]/.test(password)) return 'Password must contain an uppercase letter';
+    if (!/[a-z]/.test(password)) return 'Password must contain a lowercase letter';
+    if (!/[0-9]/.test(password)) return 'Password must contain a number';
+    return '';
+  }
 
   const handleSignIn = (e: React.FormEvent) => {
     e.preventDefault();
+    const newErrors: {[key: string]: string} = {};
+    newErrors.username = validateUsername(signInForm.username, targetUserType === 'admin');
+    newErrors.password = validatePassword(signInForm.password);
+    setErrors(newErrors);
+    if (Object.values(newErrors).some(Boolean)) return;
     // Mock sign in - in real app, validate against backend
     console.log(`${targetUserType} signing in:`, signInForm);
     
@@ -58,6 +80,14 @@ export default function SignIn({ onBack, onSignInSuccess, onGoToAdmin, onGoToSta
 
   const handleSignUp = (e: React.FormEvent) => {
     e.preventDefault();
+    const newErrors: {[key: string]: string} = {};
+    newErrors.email = validateUsername(signUpForm.email, targetUserType === 'admin');
+    newErrors.password = validatePassword(signUpForm.password);
+    if (signUpForm.password !== signUpForm.confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
+    }
+    setErrors(newErrors);
+    if (Object.values(newErrors).some(Boolean)) return;
     // Mock sign up - in real app, create account in backend
     if (signUpForm.password !== signUpForm.confirmPassword) {
       alert('Passwords do not match');
@@ -189,19 +219,23 @@ export default function SignIn({ onBack, onSignInSuccess, onGoToAdmin, onGoToSta
             <TabsContent value="signin">
               <form onSubmit={handleSignIn} className="space-y-4">
                 <div>
-                  <Label htmlFor="signin-email">Email</Label>
+                  <Label htmlFor="signin-username">Username</Label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      id="signin-email"
-                      type="email"
-                      value={signInForm.email}
-                      onChange={(e) => setSignInForm({ ...signInForm, email: e.target.value })}
-                      className="pl-10 bg-background/50 border-white/20"
-                      placeholder="your@email.com"
+                      id="signin-username"
+                      type="text"
+                      value={signInForm.username}
+                      onChange={(e) => {
+                        setSignInForm({ ...signInForm, username: e.target.value });
+                        if (errors.username) setErrors(prev => ({ ...prev, username: '' }));
+                      }}
+                      className={`pl-10 bg-background/50 border-white/20${errors.username ? ' border-destructive' : ''}`}
+                      placeholder="Your username"
                       required
                     />
                   </div>
+                  {errors.username && <p className="text-xs text-destructive mt-1">{errors.username}</p>}
                 </div>
 
                 <div>
@@ -212,12 +246,16 @@ export default function SignIn({ onBack, onSignInSuccess, onGoToAdmin, onGoToSta
                       id="signin-password"
                       type="password"
                       value={signInForm.password}
-                      onChange={(e) => setSignInForm({ ...signInForm, password: e.target.value })}
-                      className="pl-10 bg-background/50 border-white/20"
+                      onChange={(e) => {
+                        setSignInForm({ ...signInForm, password: e.target.value });
+                        if (errors.password) setErrors(prev => ({ ...prev, password: '' }));
+                      }}
+                      className={`pl-10 bg-background/50 border-white/20${errors.password ? ' border-destructive' : ''}`}
                       placeholder="••••••••"
                       required
                     />
                   </div>
+                  {errors.password && <p className="text-xs text-destructive mt-1">{errors.password}</p>}
                 </div>
 
                 <Button type="submit" className="w-full bg-primary hover:bg-primary/90 mt-6 frontdash-glow">
@@ -270,12 +308,16 @@ export default function SignIn({ onBack, onSignInSuccess, onGoToAdmin, onGoToSta
                       id="signup-email"
                       type="email"
                       value={signUpForm.email}
-                      onChange={(e) => setSignUpForm({ ...signUpForm, email: e.target.value })}
-                      className="pl-10 bg-background/50 border-white/20"
+                      onChange={(e) => {
+                        setSignUpForm({ ...signUpForm, email: e.target.value });
+                        if (errors.email) setErrors(prev => ({ ...prev, email: '' }));
+                      }}
+                      className={`pl-10 bg-background/50 border-white/20${errors.email ? ' border-destructive' : ''}`}
                       placeholder="your@email.com"
                       required
                     />
                   </div>
+                  {errors.email && <p className="text-xs text-destructive mt-1">{errors.email}</p>}
                 </div>
 
                 <div>
@@ -286,12 +328,16 @@ export default function SignIn({ onBack, onSignInSuccess, onGoToAdmin, onGoToSta
                       id="signup-password"
                       type="password"
                       value={signUpForm.password}
-                      onChange={(e) => setSignUpForm({ ...signUpForm, password: e.target.value })}
-                      className="pl-10 bg-background/50 border-white/20"
+                      onChange={(e) => {
+                        setSignUpForm({ ...signUpForm, password: e.target.value });
+                        if (errors.password) setErrors(prev => ({ ...prev, password: '' }));
+                      }}
+                      className={`pl-10 bg-background/50 border-white/20${errors.password ? ' border-destructive' : ''}`}
                       placeholder="••••••••"
                       required
                     />
                   </div>
+                  {errors.password && <p className="text-xs text-destructive mt-1">{errors.password}</p>}
                 </div>
 
                 <div>
@@ -302,12 +348,16 @@ export default function SignIn({ onBack, onSignInSuccess, onGoToAdmin, onGoToSta
                       id="signup-confirm-password"
                       type="password"
                       value={signUpForm.confirmPassword}
-                      onChange={(e) => setSignUpForm({ ...signUpForm, confirmPassword: e.target.value })}
-                      className="pl-10 bg-background/50 border-white/20"
+                      onChange={(e) => {
+                        setSignUpForm({ ...signUpForm, confirmPassword: e.target.value });
+                        if (errors.confirmPassword) setErrors(prev => ({ ...prev, confirmPassword: '' }));
+                      }}
+                      className={`pl-10 bg-background/50 border-white/20${errors.confirmPassword ? ' border-destructive' : ''}`}
                       placeholder="••••••••"
                       required
                     />
                   </div>
+                  {errors.confirmPassword && <p className="text-xs text-destructive mt-1">{errors.confirmPassword}</p>}
                 </div>
 
                 {/* Admin-specific fields */}

@@ -12,7 +12,7 @@ interface AdminSignInProps {
 }
 
 export default function AdminSignIn({ onBack, onSignInSuccess }: AdminSignInProps) {
-  const [signInForm, setSignInForm] = useState({ email: '', password: '' });
+  const [signInForm, setSignInForm] = useState({ username: '', password: '' });
   const [signUpForm, setSignUpForm] = useState({ 
     name: '', 
     email: '', 
@@ -21,23 +21,45 @@ export default function AdminSignIn({ onBack, onSignInSuccess }: AdminSignInProp
     adminCode: ''
   });
   const [activeTab, setActiveTab] = useState('signin');
+  const [errors, setErrors] = useState<{[key: string]: string}>({});
+
+  // Admin username: no special rule, but still validate email format
+  function validateUsername(username: string) {
+    if (!username.trim()) return 'Email is required';
+    return '';
+  }
+  function validatePassword(password: string) {
+    if (password.length < 6) return 'Password must be at least 6 characters';
+    if (!/[A-Z]/.test(password)) return 'Password must contain an uppercase letter';
+    if (!/[a-z]/.test(password)) return 'Password must contain a lowercase letter';
+    if (!/[0-9]/.test(password)) return 'Password must contain a number';
+    return '';
+  }
 
   const handleSignIn = (e: React.FormEvent) => {
     e.preventDefault();
+    const newErrors: {[key: string]: string} = {};
+    newErrors.username = validateUsername(signInForm.username);
+    newErrors.password = validatePassword(signInForm.password);
+    setErrors(newErrors);
+    if (Object.values(newErrors).some(Boolean)) return;
     console.log('Admin signing in:', signInForm);
     onSignInSuccess();
   };
 
   const handleSignUp = (e: React.FormEvent) => {
     e.preventDefault();
+    const newErrors: {[key: string]: string} = {};
+    newErrors.email = validateUsername(signUpForm.email);
+    newErrors.password = validatePassword(signUpForm.password);
     if (signUpForm.password !== signUpForm.confirmPassword) {
-      alert('Passwords do not match');
-      return;
+      newErrors.confirmPassword = 'Passwords do not match';
     }
     if (!signUpForm.adminCode || signUpForm.adminCode !== 'ADMIN2024') {
-      alert('Invalid admin code');
-      return;
+      newErrors.adminCode = 'Invalid admin code';
     }
+    setErrors(newErrors);
+    if (Object.values(newErrors).some(Boolean)) return;
     console.log('Admin signing up:', signUpForm);
     onSignInSuccess();
   };
@@ -75,19 +97,23 @@ export default function AdminSignIn({ onBack, onSignInSuccess }: AdminSignInProp
             <TabsContent value="signin">
               <form onSubmit={handleSignIn} className="space-y-4">
                 <div>
-                  <Label htmlFor="admin-signin-email">Admin Email</Label>
+                  <Label htmlFor="admin-signin-username">Username</Label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      id="admin-signin-email"
-                      type="email"
-                      value={signInForm.email}
-                      onChange={(e) => setSignInForm({ ...signInForm, email: e.target.value })}
-                      className="pl-10 bg-background/50 border-white/20"
-                      placeholder="admin@frontdash.com"
+                      id="admin-signin-username"
+                      type="text"
+                      value={signInForm.username}
+                      onChange={(e) => {
+                        setSignInForm({ ...signInForm, username: e.target.value });
+                        if (errors.username) setErrors(prev => ({ ...prev, username: '' }));
+                      }}
+                      className={`pl-10 bg-background/50 border-white/20${errors.username ? ' border-destructive' : ''}`}
+                      placeholder="Admin username"
                       required
                     />
                   </div>
+                  {errors.username && <p className="text-xs text-destructive mt-1">{errors.username}</p>}
                 </div>
 
                 <div>
@@ -98,12 +124,16 @@ export default function AdminSignIn({ onBack, onSignInSuccess }: AdminSignInProp
                       id="admin-signin-password"
                       type="password"
                       value={signInForm.password}
-                      onChange={(e) => setSignInForm({ ...signInForm, password: e.target.value })}
-                      className="pl-10 bg-background/50 border-white/20"
+                      onChange={(e) => {
+                        setSignInForm({ ...signInForm, password: e.target.value });
+                        if (errors.password) setErrors(prev => ({ ...prev, password: '' }));
+                      }}
+                      className={`pl-10 bg-background/50 border-white/20${errors.password ? ' border-destructive' : ''}`}
                       placeholder="••••••••"
                       required
                     />
                   </div>
+                  {errors.password && <p className="text-xs text-destructive mt-1">{errors.password}</p>}
                 </div>
 
                 <Button type="submit" className="w-full bg-primary hover:bg-primary/90 mt-6 frontdash-glow">
@@ -150,12 +180,16 @@ export default function AdminSignIn({ onBack, onSignInSuccess }: AdminSignInProp
                       id="admin-signup-email"
                       type="email"
                       value={signUpForm.email}
-                      onChange={(e) => setSignUpForm({ ...signUpForm, email: e.target.value })}
-                      className="pl-10 bg-background/50 border-white/20"
+                      onChange={(e) => {
+                        setSignUpForm({ ...signUpForm, email: e.target.value });
+                        if (errors.email) setErrors(prev => ({ ...prev, email: '' }));
+                      }}
+                      className={`pl-10 bg-background/50 border-white/20${errors.email ? ' border-destructive' : ''}`}
                       placeholder="admin@frontdash.com"
                       required
                     />
                   </div>
+                  {errors.email && <p className="text-xs text-destructive mt-1">{errors.email}</p>}
                 </div>
 
                 <div>
@@ -166,12 +200,16 @@ export default function AdminSignIn({ onBack, onSignInSuccess }: AdminSignInProp
                       id="admin-signup-admincode"
                       type="text"
                       value={signUpForm.adminCode}
-                      onChange={(e) => setSignUpForm({ ...signUpForm, adminCode: e.target.value })}
-                      className="pl-10 bg-background/50 border-white/20"
+                      onChange={(e) => {
+                        setSignUpForm({ ...signUpForm, adminCode: e.target.value });
+                        if (errors.adminCode) setErrors(prev => ({ ...prev, adminCode: '' }));
+                      }}
+                      className={`pl-10 bg-background/50 border-white/20${errors.adminCode ? ' border-destructive' : ''}`}
                       placeholder="Enter admin code"
                       required
                     />
                   </div>
+                  {errors.adminCode && <p className="text-xs text-destructive mt-1">{errors.adminCode}</p>}
                   <p className="text-xs text-muted-foreground mt-1">
                     Contact system administrator for the authorization code
                   </p>
@@ -185,12 +223,16 @@ export default function AdminSignIn({ onBack, onSignInSuccess }: AdminSignInProp
                       id="admin-signup-password"
                       type="password"
                       value={signUpForm.password}
-                      onChange={(e) => setSignUpForm({ ...signUpForm, password: e.target.value })}
-                      className="pl-10 bg-background/50 border-white/20"
+                      onChange={(e) => {
+                        setSignUpForm({ ...signUpForm, password: e.target.value });
+                        if (errors.password) setErrors(prev => ({ ...prev, password: '' }));
+                      }}
+                      className={`pl-10 bg-background/50 border-white/20${errors.password ? ' border-destructive' : ''}`}
                       placeholder="••••••••"
                       required
                     />
                   </div>
+                  {errors.password && <p className="text-xs text-destructive mt-1">{errors.password}</p>}
                 </div>
 
                 <div>
@@ -201,12 +243,16 @@ export default function AdminSignIn({ onBack, onSignInSuccess }: AdminSignInProp
                       id="admin-signup-confirm-password"
                       type="password"
                       value={signUpForm.confirmPassword}
-                      onChange={(e) => setSignUpForm({ ...signUpForm, confirmPassword: e.target.value })}
-                      className="pl-10 bg-background/50 border-white/20"
+                      onChange={(e) => {
+                        setSignUpForm({ ...signUpForm, confirmPassword: e.target.value });
+                        if (errors.confirmPassword) setErrors(prev => ({ ...prev, confirmPassword: '' }));
+                      }}
+                      className={`pl-10 bg-background/50 border-white/20${errors.confirmPassword ? ' border-destructive' : ''}`}
                       placeholder="••••••••"
                       required
                     />
                   </div>
+                  {errors.confirmPassword && <p className="text-xs text-destructive mt-1">{errors.confirmPassword}</p>}
                 </div>
 
                 <Button type="submit" className="w-full bg-primary hover:bg-primary/90 mt-6 frontdash-glow">

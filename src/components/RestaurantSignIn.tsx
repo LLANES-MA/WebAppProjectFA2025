@@ -12,7 +12,7 @@ interface RestaurantSignInProps {
 }
 
 export default function RestaurantSignIn({ onBack, onSignInSuccess }: RestaurantSignInProps) {
-  const [signInForm, setSignInForm] = useState({ email: '', password: '' });
+  const [signInForm, setSignInForm] = useState({ username: '', password: '' });
   const [signUpForm, setSignUpForm] = useState({ 
     ownerName: '', 
     restaurantName: '',
@@ -23,19 +23,43 @@ export default function RestaurantSignIn({ onBack, onSignInSuccess }: Restaurant
     address: ''
   });
   const [activeTab, setActiveTab] = useState('signin');
+  const [errors, setErrors] = useState<{[key: string]: string}>({});
+
+  function validateUsername(username: string) {
+    if (!/^[A-Za-z]{2,}\d{2,}$/.test(username)) {
+      return 'Username must have at least 2 letters followed by at least 2 digits';
+    }
+    return '';
+  }
+  function validatePassword(password: string) {
+    if (password.length < 6) return 'Password must be at least 6 characters';
+    if (!/[A-Z]/.test(password)) return 'Password must contain an uppercase letter';
+    if (!/[a-z]/.test(password)) return 'Password must contain a lowercase letter';
+    if (!/[0-9]/.test(password)) return 'Password must contain a number';
+    return '';
+  }
 
   const handleSignIn = (e: React.FormEvent) => {
     e.preventDefault();
+    const newErrors: {[key: string]: string} = {};
+    newErrors.username = validateUsername(signInForm.username);
+    newErrors.password = validatePassword(signInForm.password);
+    setErrors(newErrors);
+    if (Object.values(newErrors).some(Boolean)) return;
     console.log('Restaurant owner signing in:', signInForm);
     onSignInSuccess();
   };
 
   const handleSignUp = (e: React.FormEvent) => {
     e.preventDefault();
+    const newErrors: {[key: string]: string} = {};
+    newErrors.email = validateUsername(signUpForm.email);
+    newErrors.password = validatePassword(signUpForm.password);
     if (signUpForm.password !== signUpForm.confirmPassword) {
-      alert('Passwords do not match');
-      return;
+      newErrors.confirmPassword = 'Passwords do not match';
     }
+    setErrors(newErrors);
+    if (Object.values(newErrors).some(Boolean)) return;
     console.log('Restaurant owner signing up:', signUpForm);
     onSignInSuccess();
   };
@@ -73,19 +97,23 @@ export default function RestaurantSignIn({ onBack, onSignInSuccess }: Restaurant
             <TabsContent value="signin">
               <form onSubmit={handleSignIn} className="space-y-4">
                 <div>
-                  <Label htmlFor="restaurant-signin-email">Restaurant Email</Label>
+                  <Label htmlFor="restaurant-signin-username">Username</Label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      id="restaurant-signin-email"
-                      type="email"
-                      value={signInForm.email}
-                      onChange={(e) => setSignInForm({ ...signInForm, email: e.target.value })}
-                      className="pl-10 bg-background/50 border-white/20"
-                      placeholder="restaurant@email.com"
+                      id="restaurant-signin-username"
+                      type="text"
+                      value={signInForm.username}
+                      onChange={(e) => {
+                        setSignInForm({ ...signInForm, username: e.target.value });
+                        if (errors.username) setErrors(prev => ({ ...prev, username: '' }));
+                      }}
+                      className={`pl-10 bg-background/50 border-white/20${errors.username ? ' border-destructive' : ''}`}
+                      placeholder="Your username"
                       required
                     />
                   </div>
+                  {errors.username && <p className="text-xs text-destructive mt-1">{errors.username}</p>}
                 </div>
 
                 <div>
@@ -96,12 +124,16 @@ export default function RestaurantSignIn({ onBack, onSignInSuccess }: Restaurant
                       id="restaurant-signin-password"
                       type="password"
                       value={signInForm.password}
-                      onChange={(e) => setSignInForm({ ...signInForm, password: e.target.value })}
-                      className="pl-10 bg-background/50 border-white/20"
+                      onChange={(e) => {
+                        setSignInForm({ ...signInForm, password: e.target.value });
+                        if (errors.password) setErrors(prev => ({ ...prev, password: '' }));
+                      }}
+                      className={`pl-10 bg-background/50 border-white/20${errors.password ? ' border-destructive' : ''}`}
                       placeholder="••••••••"
                       required
                     />
                   </div>
+                  {errors.password && <p className="text-xs text-destructive mt-1">{errors.password}</p>}
                 </div>
 
                 <Button type="submit" className="w-full bg-primary hover:bg-primary/90 mt-6 frontdash-glow">
@@ -164,12 +196,16 @@ export default function RestaurantSignIn({ onBack, onSignInSuccess }: Restaurant
                       id="restaurant-signup-email"
                       type="email"
                       value={signUpForm.email}
-                      onChange={(e) => setSignUpForm({ ...signUpForm, email: e.target.value })}
-                      className="pl-10 bg-background/50 border-white/20"
+                      onChange={(e) => {
+                        setSignUpForm({ ...signUpForm, email: e.target.value });
+                        if (errors.email) setErrors(prev => ({ ...prev, email: '' }));
+                      }}
+                      className={`pl-10 bg-background/50 border-white/20${errors.email ? ' border-destructive' : ''}`}
                       placeholder="restaurant@email.com"
                       required
                     />
                   </div>
+                  {errors.email && <p className="text-xs text-destructive mt-1">{errors.email}</p>}
                 </div>
 
                 <div>
@@ -212,12 +248,16 @@ export default function RestaurantSignIn({ onBack, onSignInSuccess }: Restaurant
                       id="restaurant-signup-password"
                       type="password"
                       value={signUpForm.password}
-                      onChange={(e) => setSignUpForm({ ...signUpForm, password: e.target.value })}
-                      className="pl-10 bg-background/50 border-white/20"
+                      onChange={(e) => {
+                        setSignUpForm({ ...signUpForm, password: e.target.value });
+                        if (errors.password) setErrors(prev => ({ ...prev, password: '' }));
+                      }}
+                      className={`pl-10 bg-background/50 border-white/20${errors.password ? ' border-destructive' : ''}`}
                       placeholder="••••••••"
                       required
                     />
                   </div>
+                  {errors.password && <p className="text-xs text-destructive mt-1">{errors.password}</p>}
                 </div>
 
                 <div>
@@ -228,12 +268,16 @@ export default function RestaurantSignIn({ onBack, onSignInSuccess }: Restaurant
                       id="restaurant-signup-confirm-password"
                       type="password"
                       value={signUpForm.confirmPassword}
-                      onChange={(e) => setSignUpForm({ ...signUpForm, confirmPassword: e.target.value })}
-                      className="pl-10 bg-background/50 border-white/20"
+                      onChange={(e) => {
+                        setSignUpForm({ ...signUpForm, confirmPassword: e.target.value });
+                        if (errors.confirmPassword) setErrors(prev => ({ ...prev, confirmPassword: '' }));
+                      }}
+                      className={`pl-10 bg-background/50 border-white/20${errors.confirmPassword ? ' border-destructive' : ''}`}
                       placeholder="••••••••"
                       required
                     />
                   </div>
+                  {errors.confirmPassword && <p className="text-xs text-destructive mt-1">{errors.confirmPassword}</p>}
                 </div>
 
                 <Button type="submit" className="w-full bg-primary hover:bg-primary/90 mt-6 frontdash-glow">
