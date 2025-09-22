@@ -30,7 +30,16 @@ const allRestaurants = [
     deliveryFee: "Free",
     image: "https://images.unsplash.com/photo-1643757412923-619484c906f2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxidXJnZXIlMjBmb29kfGVufDF8fHx8MTc1NjgyMzQ5M3ww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
     promo: "Free Delivery",
-    description: "America's favorite chicken restaurant serving delicious sandwiches, nuggets and salads"
+    description: "America's favorite chicken restaurant serving delicious sandwiches, nuggets and salads",
+    operatingHours: {
+      monday: { open: '06:00', close: '22:00', closed: false },
+      tuesday: { open: '06:00', close: '22:00', closed: false },
+      wednesday: { open: '06:00', close: '22:00', closed: false },
+      thursday: { open: '06:00', close: '22:00', closed: false },
+      friday: { open: '06:00', close: '22:00', closed: false },
+      saturday: { open: '06:00', close: '22:00', closed: false },
+      sunday: { open: '08:00', close: '20:00', closed: false }
+    }
   },
   {
     id: 2,
@@ -41,7 +50,16 @@ const allRestaurants = [
     deliveryFee: "$2.99",
     image: "https://images.unsplash.com/photo-1563245738-9169ff58eccf?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwaXp6YSUyMHJlc3RhdXJhbnR8ZW58MXx8fHwxNzU2ODMzNDk5fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
     promo: "20% OFF",
-    description: "Authentic Italian pizzas made with fresh ingredients and traditional recipes"
+    description: "Authentic Italian pizzas made with fresh ingredients and traditional recipes",
+    operatingHours: {
+      monday: { open: '11:00', close: '22:00', closed: false },
+      tuesday: { open: '11:00', close: '22:00', closed: false },
+      wednesday: { open: '11:00', close: '22:00', closed: false },
+      thursday: { open: '11:00', close: '22:00', closed: false },
+      friday: { open: '11:00', close: '23:00', closed: false },
+      saturday: { open: '11:00', close: '23:00', closed: false },
+      sunday: { open: '12:00', close: '21:00', closed: false }
+    }
   },
   {
     id: 3,
@@ -51,7 +69,16 @@ const allRestaurants = [
     deliveryTime: "30-40 min",
     deliveryFee: "$3.99",
     image: "https://images.unsplash.com/photo-1696449241254-11cf7f18ce32?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzdXNoaSUyMHJlc3RhdXJhbnR8ZW58MXx8fHwxNzU2NzUwNzg4fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    description: "Fresh sushi and Japanese cuisine prepared by skilled chefs using premium ingredients"
+    description: "Fresh sushi and Japanese cuisine prepared by skilled chefs using premium ingredients",
+    operatingHours: {
+      monday: { open: '17:00', close: '22:00', closed: false },
+      tuesday: { open: '17:00', close: '22:00', closed: false },
+      wednesday: { open: '17:00', close: '22:00', closed: false },
+      thursday: { open: '17:00', close: '22:00', closed: false },
+      friday: { open: '17:00', close: '23:00', closed: false },
+      saturday: { open: '17:00', close: '23:00', closed: false },
+      sunday: { open: '17:00', close: '21:00', closed: false }
+    }
   },
   {
     id: 4,
@@ -61,7 +88,16 @@ const allRestaurants = [
     deliveryTime: "20-30 min",
     deliveryFee: "$2.49",
     image: "https://images.unsplash.com/photo-1662197480393-2a82030b7b83?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxpdGFsaWFuJTIwcGFzdGF8ZW58MXx8fHwxNzU2ODIzNDk0fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    description: "Traditional Italian comfort food and homemade pasta dishes"
+    description: "Traditional Italian comfort food and homemade pasta dishes",
+    operatingHours: {
+      monday: { open: '10:00', close: '21:00', closed: false },
+      tuesday: { open: '10:00', close: '21:00', closed: false },
+      wednesday: { open: '10:00', close: '21:00', closed: false },
+      thursday: { open: '10:00', close: '21:00', closed: false },
+      friday: { open: '10:00', close: '22:00', closed: false },
+      saturday: { open: '10:00', close: '22:00', closed: false },
+      sunday: { open: '10:00', close: '20:00', closed: false }
+    }
   },
   {
     id: 5,
@@ -71,7 +107,16 @@ const allRestaurants = [
     deliveryTime: "25-35 min",
     deliveryFee: "$1.99",
     image: "https://images.unsplash.com/photo-1643757412923-619484c906f2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxidXJnZXIlMjBmb29kfGVufDF8fHx8MTc1NjgyMzQ5M3ww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    description: "Gourmet burgers made with premium beef and fresh toppings"
+    description: "Gourmet burgers made with premium beef and fresh toppings",
+    operatingHours: {
+      monday: { open: '11:00', close: '23:00', closed: false },
+      tuesday: { open: '11:00', close: '23:00', closed: false },
+      wednesday: { open: '11:00', close: '23:00', closed: false },
+      thursday: { open: '11:00', close: '23:00', closed: false },
+      friday: { open: '11:00', close: '24:00', closed: false },
+      saturday: { open: '11:00', close: '24:00', closed: false },
+      sunday: { open: '11:00', close: '22:00', closed: false }
+    }
   },
   {
     id: 6,
@@ -81,7 +126,16 @@ const allRestaurants = [
     deliveryTime: "20-30 min",
     deliveryFee: "$2.99",
     image: "https://images.unsplash.com/photo-1696449241254-11cf7f18ce32?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzdXNoaSUyMHJlc3RhdXJhbnR8ZW58MXx8fHwxNzU2NzUwNzg4fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    description: "Authentic Mexican street food and fresh tacos made to order"
+    description: "Authentic Mexican street food and fresh tacos made to order",
+    operatingHours: {
+      monday: { open: '09:00', close: '22:00', closed: false },
+      tuesday: { open: '09:00', close: '22:00', closed: false },
+      wednesday: { open: '09:00', close: '22:00', closed: false },
+      thursday: { open: '09:00', close: '22:00', closed: false },
+      friday: { open: '09:00', close: '23:00', closed: false },
+      saturday: { open: '09:00', close: '23:00', closed: false },
+      sunday: { open: '10:00', close: '21:00', closed: false }
+    }
   },
   {
     id: 7,
@@ -91,7 +145,16 @@ const allRestaurants = [
     deliveryTime: "25-35 min",
     deliveryFee: "$3.49",
     image: "https://images.unsplash.com/photo-1696449241254-11cf7f18ce32?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzdXNoaSUyMHJlc3RhdXJhbnR8ZW58MXx8fHwxNzU2NzUwNzg4fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    description: "Traditional Chinese cuisine with bold flavors and generous portions"
+    description: "Traditional Chinese cuisine with bold flavors and generous portions",
+    operatingHours: {
+      monday: { open: '11:00', close: '22:00', closed: false },
+      tuesday: { open: '11:00', close: '22:00', closed: false },
+      wednesday: { open: '11:00', close: '22:00', closed: false },
+      thursday: { open: '11:00', close: '22:00', closed: false },
+      friday: { open: '11:00', close: '23:00', closed: false },
+      saturday: { open: '11:00', close: '23:00', closed: false },
+      sunday: { open: '12:00', close: '21:00', closed: false }
+    }
   },
   {
     id: 8,
@@ -101,23 +164,73 @@ const allRestaurants = [
     deliveryTime: "35-45 min",
     deliveryFee: "$4.99",
     image: "https://images.unsplash.com/photo-1643757412923-619484c906f2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxidXJnZXIlMjBmb29kfGVufDF8fHx8MTc1NjgyMzQ5M3ww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    description: "Premium steaks and fine dining experience with exceptional service"
+    description: "Premium steaks and fine dining experience with exceptional service",
+    operatingHours: {
+      monday: { open: '17:00', close: '22:00', closed: false },
+      tuesday: { open: '17:00', close: '22:00', closed: false },
+      wednesday: { open: '17:00', close: '22:00', closed: false },
+      thursday: { open: '17:00', close: '22:00', closed: false },
+      friday: { open: '17:00', close: '23:00', closed: false },
+      saturday: { open: '17:00', close: '23:00', closed: false },
+      sunday: { open: '17:00', close: '21:00', closed: false }
+    }
   }
 ];
 
 export default function AllRestaurants({ onBack, onRestaurantSelect, onRestaurantSignup, onViewCart, onGoToAccount, onGoToSettings, onGoToSignIn, searchQuery = '', deliveryAddress = '', onDeliveryAddressChange }: AllRestaurantsProps) {
   const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery);
 
-  // Filter restaurants based on search query
+  // Function to check if restaurant is currently closed
+  const isRestaurantClosed = (restaurant: any) => {
+    const now = new Date();
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const currentDay = dayNames[now.getDay()];
+    const currentTime = now.toTimeString().substring(0, 5); // HH:MM format
+    
+    const dayKey = currentDay as keyof typeof restaurant.operatingHours;
+    const todayHours = restaurant.operatingHours[dayKey];
+    
+    // If restaurant is closed on this day
+    if (todayHours.closed) {
+      return true;
+    }
+    
+    // If no operating hours set for this day
+    if (!todayHours.open || !todayHours.close) {
+      return true;
+    }
+    
+    // Check if current time is within operating hours
+    return currentTime < todayHours.open || currentTime > todayHours.close;
+  };
+
+  // Filter and sort restaurants based on search query and operating status
   const filteredRestaurants = useMemo(() => {
     const query = localSearchQuery.toLowerCase();
-    if (!query) return allRestaurants;
+    let restaurants = allRestaurants;
     
-    return allRestaurants.filter(restaurant => 
-      restaurant.name.toLowerCase().includes(query) ||
-      restaurant.cuisine.toLowerCase().includes(query) ||
-      restaurant.description.toLowerCase().includes(query)
-    );
+    // Filter by search query
+    if (query) {
+      restaurants = restaurants.filter(restaurant => 
+        restaurant.name.toLowerCase().includes(query) ||
+        restaurant.cuisine.toLowerCase().includes(query) ||
+        restaurant.description.toLowerCase().includes(query)
+      );
+    }
+    
+    // Sort restaurants: open restaurants first, then closed restaurants
+    return restaurants.sort((a, b) => {
+      const aClosed = isRestaurantClosed(a);
+      const bClosed = isRestaurantClosed(b);
+      
+      // If both have same status, maintain original order
+      if (aClosed === bClosed) {
+        return 0;
+      }
+      
+      // Open restaurants come first
+      return aClosed ? 1 : -1;
+    });
   }, [localSearchQuery]);
 
   const displayQuery = localSearchQuery || searchQuery;
@@ -374,70 +487,108 @@ export default function AllRestaurants({ onBack, onRestaurantSelect, onRestauran
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredRestaurants.map((restaurant) => (
-            <Card
-              key={restaurant.id}
-              className="group cursor-pointer transition-all duration-300 hover:scale-105 bg-card/40 backdrop-blur-sm border-white/10 hover:border-primary/30 overflow-hidden"
-              onClick={() => onRestaurantSelect(restaurant)}
-            >
-              <div className="relative">
-                <div className="aspect-video bg-gradient-to-br from-muted/20 to-muted/5 relative overflow-hidden">
-                  <ImageWithFallback
-                    src={restaurant.image}
-                    alt={restaurant.name}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                </div>
-                {restaurant.promo && (
-                  <Badge className="absolute top-3 left-3 bg-primary text-primary-foreground">
-                    {restaurant.promo}
-                  </Badge>
-                )}
-              </div>
-              
-              <CardContent className="p-4">
-                <div className="space-y-3">
-                  <div>
-                    <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
-                      {restaurant.name}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">{restaurant.cuisine}</p>
-                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                      {restaurant.description}
-                    </p>
+            {filteredRestaurants.map((restaurant) => {
+              const isClosed = isRestaurantClosed(restaurant);
+              return (
+                <Card
+                  key={restaurant.id}
+                  className={`group cursor-pointer transition-all duration-300 ${
+                    isClosed 
+                      ? 'opacity-60 grayscale hover:scale-100' 
+                      : 'hover:scale-105'
+                  } bg-card/40 backdrop-blur-sm border-white/10 hover:border-primary/30 overflow-hidden`}
+                  onClick={() => onRestaurantSelect(restaurant)}
+                >
+                  <div className="relative">
+                    <div className="aspect-video bg-gradient-to-br from-muted/20 to-muted/5 relative overflow-hidden">
+                      <ImageWithFallback
+                        src={restaurant.image}
+                        alt={restaurant.name}
+                        className={`w-full h-full object-cover transition-transform duration-300 ${
+                          isClosed ? '' : 'group-hover:scale-110'
+                        }`}
+                      />
+                      <div className={`absolute inset-0 bg-gradient-to-t from-black/60 to-transparent transition-opacity duration-300 ${
+                        isClosed ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                      }`} />
+                    </div>
+                    {isClosed && (
+                      <Badge className="absolute top-3 left-3 bg-red-500 text-white">
+                        CLOSED
+                      </Badge>
+                    )}
+                    {restaurant.promo && !isClosed && (
+                      <Badge className="absolute top-3 right-3 bg-primary text-primary-foreground">
+                        {restaurant.promo}
+                      </Badge>
+                    )}
                   </div>
                   
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center space-x-1 text-yellow-500">
-                      <Star className="h-4 w-4 fill-current" />
-                      <span className="text-foreground">{restaurant.rating}</span>
+                  <CardContent className="p-4">
+                    <div className="space-y-3">
+                      <div>
+                        <h3 className={`font-semibold transition-colors ${
+                          isClosed 
+                            ? 'text-muted-foreground' 
+                            : 'text-foreground group-hover:text-primary'
+                        }`}>
+                          {restaurant.name}
+                        </h3>
+                        <p className={`text-sm ${
+                          isClosed ? 'text-muted-foreground/60' : 'text-muted-foreground'
+                        }`}>
+                          {restaurant.cuisine}
+                        </p>
+                        <p className={`text-xs mt-1 line-clamp-2 ${
+                          isClosed ? 'text-muted-foreground/60' : 'text-muted-foreground'
+                        }`}>
+                          {restaurant.description}
+                        </p>
+                      </div>
+                      
+                      <div className="flex items-center justify-between text-sm">
+                        <div className={`flex items-center space-x-1 ${
+                          isClosed ? 'text-muted-foreground/60' : 'text-yellow-500'
+                        }`}>
+                          <Star className={`h-4 w-4 ${isClosed ? '' : 'fill-current'}`} />
+                          <span className={isClosed ? 'text-muted-foreground/60' : 'text-foreground'}>
+                            {restaurant.rating}
+                          </span>
+                        </div>
+                        <div className={`flex items-center space-x-1 ${
+                          isClosed ? 'text-muted-foreground/60' : 'text-muted-foreground'
+                        }`}>
+                          <Clock className="h-4 w-4" />
+                          <span>{restaurant.deliveryTime}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <span className={`text-sm ${
+                          isClosed ? 'text-muted-foreground/60' : 'text-muted-foreground'
+                        }`}>
+                          Delivery: {restaurant.deliveryFee}
+                        </span>
+                        <Button 
+                          size="sm" 
+                          className={`${
+                            isClosed 
+                              ? 'bg-muted text-muted-foreground cursor-not-allowed' 
+                              : 'bg-primary hover:bg-primary/90 text-primary-foreground'
+                          }`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRestaurantSelect(restaurant);
+                          }}
+                        >
+                          {isClosed ? 'Closed' : 'Order Now'}
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex items-center space-x-1 text-muted-foreground">
-                      <Clock className="h-4 w-4" />
-                      <span>{restaurant.deliveryTime}</span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">
-                      Delivery: {restaurant.deliveryFee}
-                    </span>
-                    <Button 
-                      size="sm" 
-                      className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onRestaurantSelect(restaurant);
-                      }}
-                    >
-                      Order Now
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
