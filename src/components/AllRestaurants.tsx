@@ -364,59 +364,6 @@ export default function AllRestaurants({ onBack, onRestaurantSelect, onRestauran
                         </div>
                         For Restaurants
                       </Button>
-                      <Button 
-                        variant="ghost" 
-                        className="w-full justify-start h-12 text-muted-foreground hover:text-foreground hover:bg-muted/5 rounded-xl"
-                        onClick={() => {
-                          if (onGoToAdmin) onGoToAdmin();
-                        }}
-                      >
-                        <div className="flex items-center justify-center w-8 h-8 bg-muted/10 rounded-lg mr-3">
-                          <User className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                        Admin Portal
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        className="w-full justify-start h-12 text-muted-foreground hover:text-foreground hover:bg-muted/5 rounded-xl"
-                        onClick={() => {
-                          if (onGoToStaff) onGoToStaff();
-                        }}
-                      >
-                        <div className="flex items-center justify-center w-8 h-8 bg-muted/10 rounded-lg mr-3">
-                          <User className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                        Staff Portal
-                      </Button>
-                    </div>
-
-                    {/* Account Section */}
-                    <div className="border-t border-white/5 pt-6 space-y-2 pb-6">
-                      <div className="text-xs font-semibold text-muted-foreground/80 mb-3 px-2 tracking-wider">ACCOUNT</div>
-                      <Button 
-                        variant="ghost" 
-                        className="w-full justify-start h-12 text-foreground hover:text-foreground/80 hover:bg-muted/5 rounded-xl"
-                        onClick={() => {
-                          if (onGoToAccount) onGoToAccount();
-                        }}
-                      >
-                        <div className="flex items-center justify-center w-8 h-8 bg-muted/10 rounded-lg mr-3">
-                          <User className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                        My Account
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        className="w-full justify-start h-12 text-foreground hover:text-foreground/80 hover:bg-muted/5 rounded-xl"
-                        onClick={() => {
-                          if (onGoToSettings) onGoToSettings();
-                        }}
-                      >
-                        <div className="flex items-center justify-center w-8 h-8 bg-muted/10 rounded-lg mr-3">
-                          <Settings className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                        Settings
-                      </Button>
                     </div>
 
                     {/* Navigation Actions */}

@@ -32,25 +32,51 @@ const steps = [
   { id: 1, title: 'Basic Information', description: 'Tell us about your restaurant' },
   { id: 2, title: 'Location & Contact', description: 'Where can customers find you?' },
   { id: 3, title: 'Menu & Pricing', description: 'Showcase your delicious offerings' },
-  { id: 4, title: 'Business Verification', description: 'Verify your business credentials' },
-  { id: 5, title: 'Review & Submit', description: 'Review and submit your application' }
+  { id: 4, title: 'Review & Submit', description: 'Review and submit your application' }
 ];
 
 const cuisineTypes = [
   'Italian', 'Chinese', 'Mexican', 'Indian', 'Japanese', 'Thai', 'American',
   'Mediterranean', 'French', 'Korean', 'Vietnamese', 'Pizza', 'Burgers', 'Seafood'
+  // "Other" will be handled separately
+];
+
+const usStates = [
+  'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'
 ];
 
 export default function RestaurantRegistration({ onComplete, onBack }: RestaurantRegistrationProps) {
   const [currentStep, setCurrentStep] = useState(1);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    restaurantName: string;
+    description: string;
+    cuisineType: string[];
+    establishedYear: string;
+    address: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    phone: string;
+    email: string;
+    website: string;
+    averagePrice: string;
+    deliveryFee: string;
+    minimumOrder: string;
+    preparationTime: string;
+    operatingHours: {
+      [key: string]: {
+        open: string;
+        close: string;
+        closed: boolean;
+        allDay: boolean;
+      };
+    };
+  }>({
     // Basic Info
     restaurantName: '',
     description: '',
-    cuisineType: '',
+    cuisineType: [],
     establishedYear: '',
-
-    // Location & Contact
     address: '',
     city: '',
     state: '',
@@ -58,34 +84,32 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
     phone: '',
     email: '',
     website: '',
-
-    // Menu & Operations
     averagePrice: '',
     deliveryFee: '',
     minimumOrder: '',
     preparationTime: '',
     operatingHours: {
-      monday: { open: '', close: '', closed: false },
-      tuesday: { open: '', close: '', closed: false },
-      wednesday: { open: '', close: '', closed: false },
-      thursday: { open: '', close: '', closed: false },
-      friday: { open: '', close: '', closed: false },
-      saturday: { open: '', close: '', closed: false },
-      sunday: { open: '', close: '', closed: false }
-    },
-
-    // Business Info
-    businessLicense: '',
-    taxId: '',
-    ownerName: '',
-    bankAccount: ''
+      monday: { open: '', close: '', closed: false, allDay: false },
+      tuesday: { open: '', close: '', closed: false, allDay: false },
+      wednesday: { open: '', close: '', closed: false, allDay: false },
+      thursday: { open: '', close: '', closed: false, allDay: false },
+      friday: { open: '', close: '', closed: false, allDay: false },
+      saturday: { open: '', close: '', closed: false, allDay: false },
+      sunday: { open: '', close: '', closed: false, allDay: false }
+    }
   });
+
+    
 
   const [errors, setErrors] = useState<{ [key: string]: any }>({});
 
   const [menuItems, setMenuItems] = useState([
     { name: '', description: '', price: '', category: '', image: null }
   ]);
+
+  const [customCuisine, setCustomCuisine] = useState('');
+  const [otherChecked, setOtherChecked] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const updateFormData = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -111,14 +135,62 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
     if (currentStep === 1) {
       if (!formData.restaurantName) newErrors.restaurantName = 'Restaurant name is required';
       if (!formData.description) newErrors.description = 'Description is required';
-      if (!formData.cuisineType) newErrors.cuisineType = 'Cuisine type is required';
+      if (!formData.cuisineType || formData.cuisineType.length === 0) newErrors.cuisineType = 'Select at least one cuisine type';
+
     } else if (currentStep === 2) {
       if (!formData.address) newErrors.address = 'Address is required';
       if (!formData.city) newErrors.city = 'City is required';
-      if (!formData.state) newErrors.state = 'State is required';
-      if (!formData.zipCode) newErrors.zipCode = 'ZIP code is required';
-      if (!formData.phone) newErrors.phone = 'Phone number is required';
-      if (!formData.email) newErrors.email = 'Email address is required';
+
+      // State validation
+      if (!formData.state) {
+        newErrors.state = 'State is required';
+      } else if (!usStates.includes(formData.state)) {
+        newErrors.state = 'Select a valid state';
+      }
+
+      // ZIP code validation
+      if (!formData.zipCode) {
+        newErrors.zipCode = 'ZIP code is required';
+      } else if (!/^\d{5}$/.test(formData.zipCode)) {
+        newErrors.zipCode = 'ZIP code must be 5 digits';
+      }
+
+      // Phone validation (10 digits)
+      if (!formData.phone) {
+        newErrors.phone = 'Phone number is required';
+      } else if (!/^\d{10}$/.test(formData.phone.replace(/\D/g, ''))) {
+        newErrors.phone = 'Enter a valid 10-digit phone number';
+      }
+
+      // Email validation
+      if (!formData.email) {
+        newErrors.email = 'Email address is required';
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+        newErrors.email = 'Enter a valid email address';
+      }
+
+      // Validate operating hours
+      const opHoursErrors: { [day: string]: string } = {};
+      Object.entries(formData.operatingHours).forEach(([day, hours]) => {
+        if (!hours.closed && !hours.allDay) {
+          if (!hours.open || !hours.close) {
+            opHoursErrors[day] = 'Set open and close time or mark as closed/all day';
+          } else {
+            // Compare times
+            const [openHour, openMin] = hours.open.split(':').map(Number);
+            const [closeHour, closeMin] = hours.close.split(':').map(Number);
+            const openTotal = openHour * 60 + openMin;
+            const closeTotal = closeHour * 60 + closeMin;
+            if (closeTotal <= openTotal) {
+              opHoursErrors[day] = 'Closing time must be after opening time';
+            }
+          }
+        }
+      });
+      if (Object.keys(opHoursErrors).length > 0) {
+        newErrors.operatingHours = opHoursErrors;
+      }
+
     } else if (currentStep === 3) {
       if (!formData.averagePrice) newErrors.averagePrice = 'Average price range is required';
       if (!formData.deliveryFee) newErrors.deliveryFee = 'Delivery fee is required';
@@ -139,11 +211,9 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
         newErrors.menuItems = menuErrors;
       }
     } else if (currentStep === 4) {
-      if (!formData.businessLicense) newErrors.businessLicense = 'Business license number is required';
-      if (!formData.taxId) newErrors.taxId = 'Tax ID is required';
-      if (!formData.ownerName) newErrors.ownerName = 'Owner name is required';
-    } else if (currentStep === 5) {
-      // Final review step - ensure terms are accepted (if applicable), no validation needed
+      if (!termsAccepted) {
+        newErrors.termsAccepted = 'You must accept the Terms of Service and Privacy Policy';
+      }
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -196,16 +266,61 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">Cuisine Type *</label>
-                  <Select value={formData.cuisineType} onValueChange={(value) => updateFormData('cuisineType', value)}>
-                    <SelectTrigger className={`bg-card/50 border-white/10 ${errors.cuisineType ? 'border-destructive' : ''}`}>
-                      <SelectValue placeholder="Select cuisine type" />
-                    </SelectTrigger>
-                    <SelectContent>
+                  <div className={`bg-card/50 border-white/10 rounded-md p-2 ${errors.cuisineType ? 'border-destructive' : ''}`}>
+                    <div className="grid grid-cols-2 gap-2">
                       {cuisineTypes.map((cuisine) => (
-                        <SelectItem key={cuisine} value={cuisine}>{cuisine}</SelectItem>
+                        <label key={cuisine} className="flex items-center space-x-2 cursor-pointer">
+                          <Checkbox
+                            checked={formData.cuisineType.includes(cuisine)}
+                            onCheckedChange={(checked) => {
+                              let updated: string[];
+                              if (checked) {
+                                updated = [...formData.cuisineType, cuisine];
+                              } else {
+                                updated = formData.cuisineType.filter((c) => c !== cuisine);
+                              }
+                              updateFormData('cuisineType', updated);
+                            }}
+                          />
+                          <span className="text-sm">{cuisine}</span>
+                        </label>
                       ))}
-                    </SelectContent>
-                  </Select>
+                      {/* Other option */}
+                      <label className="flex items-center space-x-2 cursor-pointer">
+                        <Checkbox
+                          checked={otherChecked}
+                          onCheckedChange={(checked) => {
+                            setOtherChecked(!!checked);
+                            if (!checked) {
+                              // Remove custom cuisine from selected
+                              updateFormData('cuisineType', formData.cuisineType.filter(c => c !== customCuisine));
+                              setCustomCuisine('');
+                            }
+                          }}
+                        />
+                        <span className="text-sm">Other</span>
+                      </label>
+                    </div>
+                    {otherChecked && (
+                      <div className="mt-2">
+                        <Input
+                          placeholder="Enter custom cuisine type"
+                          value={customCuisine}
+                          onChange={e => {
+                            const value = e.target.value;
+                            setCustomCuisine(value);
+                            // Remove previous custom cuisine, add new one if not empty
+                            let updated = formData.cuisineType.filter(c => c !== customCuisine);
+                            if (value.trim()) {
+                              updated = [...updated, value.trim()];
+                            }
+                            updateFormData('cuisineType', updated);
+                          }}
+                          className="bg-background/50 border-white/10"
+                        />
+                      </div>
+                    )}
+                  </div>
                   {errors.cuisineType && <p className="text-xs text-destructive mt-1">{errors.cuisineType}</p>}
                 </div>
 
@@ -260,12 +375,19 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2">State *</label>
-                  <Input
-                    placeholder="NY"
+                  <Select
                     value={formData.state}
-                    onChange={(e) => updateFormData('state', e.target.value)}
-                    className={`bg-card/50 border-white/10 ${errors.state ? 'border-destructive' : ''}`}
-                  />
+                    onValueChange={(value) => updateFormData('state', value)}
+                  >
+                    <SelectTrigger className={`bg-card/50 border-white/10 ${errors.state ? 'border-destructive' : ''}`}>
+                      <SelectValue placeholder="Select state" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {usStates.map((state) => (
+                        <SelectItem key={state} value={state}>{state}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   {errors.state && <p className="text-xs text-destructive mt-1">{errors.state}</p>}
                 </div>
                 <div>
@@ -339,6 +461,7 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
                             if (checked) {
                               updatedHours[day as keyof typeof formData.operatingHours].open = '';
                               updatedHours[day as keyof typeof formData.operatingHours].close = '';
+                              updatedHours[day as keyof typeof formData.operatingHours].allDay = false;
                             }
                             updateFormData('operatingHours', updatedHours);
                           }}
@@ -350,53 +473,76 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
 
                       {!hours.closed && (
                         <>
-                          <div className="flex items-center space-x-2">
-                            <span className="text-sm text-muted-foreground">Open:</span>
-                            <Select
-                              value={hours.open}
-                              onValueChange={(value) => {
-                                const updatedHours = { ...formData.operatingHours };
-                                updatedHours[day as keyof typeof formData.operatingHours].open = value;
-                                updateFormData('operatingHours', updatedHours);
-                              }}
-                            >
-                              <SelectTrigger className="w-24 bg-card/50 border-white/10">
-                                <SelectValue placeholder="--" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {Array.from({ length: 24 }, (_, i) => {
-                                  const hour = i.toString().padStart(2, '0');
-                                  return (
-                                    <SelectItem key={`${hour}:00`} value={`${hour}:00`}>{`${hour}:00`}</SelectItem>
-                                  );
-                                })}
-                              </SelectContent>
-                            </Select>
-                          </div>
+                          <Button
+                            variant={hours.allDay ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => {
+                              const updatedHours = { ...formData.operatingHours };
+                              updatedHours[day as keyof typeof formData.operatingHours].allDay = !hours.allDay;
+                              if (updatedHours[day as keyof typeof formData.operatingHours].allDay) {
+                                updatedHours[day as keyof typeof formData.operatingHours].open = '00:00';
+                                updatedHours[day as keyof typeof formData.operatingHours].close = '23:59';
+                              } else {
+                                updatedHours[day as keyof typeof formData.operatingHours].open = '';
+                                updatedHours[day as keyof typeof formData.operatingHours].close = '';
+                              }
+                              updateFormData('operatingHours', updatedHours);
+                            }}
+                          >
+                            All Day
+                          </Button>
 
-                          <div className="flex items-center space-x-2">
-                            <span className="text-sm text-muted-foreground">Close:</span>
-                            <Select
-                              value={hours.close}
-                              onValueChange={(value) => {
-                                const updatedHours = { ...formData.operatingHours };
-                                updatedHours[day as keyof typeof formData.operatingHours].close = value;
-                                updateFormData('operatingHours', updatedHours);
-                              }}
-                            >
-                              <SelectTrigger className="w-24 bg-card/50 border-white/10">
-                                <SelectValue placeholder="--" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {Array.from({ length: 24 }, (_, i) => {
-                                  const hour = i.toString().padStart(2, '0');
-                                  return (
-                                    <SelectItem key={`${hour}:00`} value={`${hour}:00`}>{`${hour}:00`}</SelectItem>
-                                  );
-                                })}
-                              </SelectContent>
-                            </Select>
-                          </div>
+                          {!hours.allDay && (
+                            <>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-sm text-muted-foreground">Open:</span>
+                                <Select
+                                  value={hours.open}
+                                  onValueChange={(value) => {
+                                    const updatedHours = { ...formData.operatingHours };
+                                    updatedHours[day as keyof typeof formData.operatingHours].open = value;
+                                    updateFormData('operatingHours', updatedHours);
+                                  }}
+                                >
+                                  <SelectTrigger className="w-24 bg-card/50 border-white/10">
+                                    <SelectValue placeholder="--" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {Array.from({ length: 24 }, (_, i) => {
+                                      const hour = i.toString().padStart(2, '0');
+                                      return (
+                                        <SelectItem key={`${hour}:00`} value={`${hour}:00`}>{`${hour}:00`}</SelectItem>
+                                      );
+                                    })}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="flex items-center space-x-2">
+                                <span className="text-sm text-muted-foreground">Close:</span>
+                                <Select
+                                  value={hours.close}
+                                  onValueChange={(value) => {
+                                    const updatedHours = { ...formData.operatingHours };
+                                    updatedHours[day as keyof typeof formData.operatingHours].close = value;
+                                    updateFormData('operatingHours', updatedHours);
+                                  }}
+                                >
+                                  <SelectTrigger className="w-24 bg-card/50 border-white/10">
+                                    <SelectValue placeholder="--" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {Array.from({ length: 24 }, (_, i) => {
+                                      const hour = i.toString().padStart(2, '0');
+                                      return (
+                                        <SelectItem key={`${hour}:00`} value={`${hour}:00`}>{`${hour}:00`}</SelectItem>
+                                      );
+                                    })}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </>
+                          )}
                         </>
                       )}
                     </div>
@@ -408,6 +554,13 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
                     💡 Tip: Set accurate hours so customers know when they can order from you. You can always update these later in your dashboard.
                   </p>
                 </div>
+                {errors.operatingHours && (
+                  <div className="mt-2">
+                    {Object.entries(errors.operatingHours).map(([day, msg]) => (
+                      <p key={day} className="text-xs text-destructive">{day}: {String(msg)}</p>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -547,65 +700,6 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
       case 4:
         return (
           <div className="space-y-6">
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Business License Number *</label>
-                <Input
-                  placeholder="Enter your business license number"
-                  value={formData.businessLicense}
-                  onChange={(e) => updateFormData('businessLicense', e.target.value)}
-                  className={`bg-card/50 border-white/10 ${errors.businessLicense ? 'border-destructive' : ''}`}
-                />
-                {errors.businessLicense && <p className="text-xs text-destructive mt-1">{errors.businessLicense}</p>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">Tax ID (EIN) *</label>
-                <Input
-                  placeholder="XX-XXXXXXX"
-                  value={formData.taxId}
-                  onChange={(e) => updateFormData('taxId', e.target.value)}
-                  className={`bg-card/50 border-white/10 ${errors.taxId ? 'border-destructive' : ''}`}
-                />
-                {errors.taxId && <p className="text-xs text-destructive mt-1">{errors.taxId}</p>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">Business Owner Name *</label>
-                <Input
-                  placeholder="Full name of business owner"
-                  value={formData.ownerName}
-                  onChange={(e) => updateFormData('ownerName', e.target.value)}
-                  className={`bg-card/50 border-white/10 ${errors.ownerName ? 'border-destructive' : ''}`}
-                />
-                {errors.ownerName && <p className="text-xs text-destructive mt-1">{errors.ownerName}</p>}
-              </div>
-
-              <Separator className="bg-white/10" />
-
-              <div>
-                <h4 className="font-medium mb-4">Required Documents</h4>
-                <div className="space-y-4">
-                  <div className="border-2 border-dashed border-white/20 rounded-lg p-6 text-center hover:border-primary/50 transition-colors cursor-pointer">
-                    <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">Upload Business License</p>
-                    <p className="text-xs text-muted-foreground">PDF, JPG, PNG up to 5MB</p>
-                  </div>
-
-                  <div className="border-2 border-dashed border-white/20 rounded-lg p-6 text-center hover:border-primary/50 transition-colors cursor-pointer">
-                    <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">Upload Food Handler's Permit</p>
-                    <p className="text-xs text-muted-foreground">PDF, JPG, PNG up to 5MB</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 5:
-        return (
-          <div className="space-y-6">
             <div className="text-center mb-8">
               <div className="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Check className="h-8 w-8 text-primary" />
@@ -626,7 +720,9 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
                   </div>
                   <div>
                     <span className="text-muted-foreground">Cuisine:</span>
-                    <p className="font-medium">{formData.cuisineType || 'Not provided'}</p>
+                    <p className="font-medium">
+                      {formData.cuisineType.filter(c => c && c.trim()).join(', ') || 'Not provided'}
+                    </p>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Location:</span>
@@ -674,11 +770,18 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
             </div>
 
             <div className="flex items-center space-x-2">
-              <Checkbox id="terms" />
+              <Checkbox
+                id="terms"
+                checked={termsAccepted}
+                onCheckedChange={checked => setTermsAccepted(!!checked)}
+              />
               <label htmlFor="terms" className="text-sm text-muted-foreground">
                 I agree to the Terms of Service and Privacy Policy
               </label>
             </div>
+            {errors.termsAccepted && (
+              <p className="text-xs text-destructive mt-1">{errors.termsAccepted}</p>
+            )}
           </div>
         );
 
@@ -719,12 +822,12 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
               </Badge>
             </div>
             <Progress value={progress} className="h-2 mb-4" />
-            <div className="grid grid-cols-5 gap-4">
+            <div className="grid grid-cols-4 gap-3">
               {steps.map((step) => (
                 <div key={step.id} className="text-center">
                   <div className={`w-8 h-8 rounded-full mx-auto mb-2 flex items-center justify-center text-sm font-medium ${step.id <= currentStep
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted text-muted-foreground'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground'
                     }`}>
                     {step.id < currentStep ? <Check className="h-4 w-4" /> : step.id}
                   </div>
@@ -758,7 +861,12 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
             </Button>
 
             {currentStep === steps.length ? (
-              <Button onClick={() => onComplete(formData)} className="bg-primary hover:bg-primary/80">
+              <Button
+                onClick={() => {
+                  if (validateStep()) onComplete(formData);
+                }}
+                className="bg-primary hover:bg-primary/80"
+              >
                 Submit Application
                 <Check className="h-4 w-4 ml-2" />
               </Button>
