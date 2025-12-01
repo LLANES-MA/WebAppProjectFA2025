@@ -4,56 +4,31 @@ import { Card } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { ArrowLeft, User, Lock, Mail, Users, Shield, Utensils, UserCircle, ArrowRight } from 'lucide-react';
+import { ArrowLeft, User, Lock, Mail, UserCircle, Shield, Users, Utensils, ArrowRight } from 'lucide-react';
 
 interface SignInProps {
   onBack: () => void;
   onSignInSuccess?: (userType: string) => void;
-  onGoToAdmin?: () => void;
-  onGoToStaff?: () => void;
-  onGoToRestaurantDashboard?: () => void;
   onGoToAdminSignIn?: () => void;
   onGoToStaffSignIn?: () => void;
   onGoToRestaurantSignIn?: () => void;
-  targetUserType?: 'customer' | 'admin' | 'staff' | 'restaurant';
 }
 
-export default function SignIn({ onBack, onSignInSuccess, onGoToAdmin, onGoToStaff, onGoToRestaurantDashboard, onGoToAdminSignIn, onGoToStaffSignIn, onGoToRestaurantSignIn, targetUserType = 'customer' }: SignInProps) {
+export default function SignIn({ onBack, onSignInSuccess, onGoToAdminSignIn, onGoToStaffSignIn, onGoToRestaurantSignIn }: SignInProps) {
   const [signInForm, setSignInForm] = useState({ email: '', password: '' });
   const [signUpForm, setSignUpForm] = useState({ 
     name: '', 
     email: '', 
     password: '', 
-    confirmPassword: '',
-    adminCode: '',
-    staffId: '',
-    restaurantCode: ''
+    confirmPassword: ''
   });
   const [activeTab, setActiveTab] = useState('signin');
-
-
 
   const handleSignIn = (e: React.FormEvent) => {
     e.preventDefault();
     // Mock sign in - in real app, validate against backend
-    console.log(`${targetUserType} signing in:`, signInForm);
-    
-    // Route to appropriate dashboard based on target user type
-    switch (targetUserType) {
-      case 'admin':
-        if (onGoToAdmin) onGoToAdmin();
-        break;
-      case 'staff':
-        if (onGoToStaff) onGoToStaff();
-        break;
-      case 'restaurant':
-        if (onGoToRestaurantDashboard) onGoToRestaurantDashboard();
-        break;
-      case 'customer':
-      default:
-        if (onSignInSuccess) onSignInSuccess('customer');
-        break;
-    }
+    console.log('Customer signing in:', signInForm);
+    if (onSignInSuccess) onSignInSuccess('customer');
   };
 
   const handleSignUp = (e: React.FormEvent) => {
@@ -63,39 +38,8 @@ export default function SignIn({ onBack, onSignInSuccess, onGoToAdmin, onGoToSta
       alert('Passwords do not match');
       return;
     }
-    
-    // Validation for specialized accounts
-    if (targetUserType === 'admin' && (!signUpForm.adminCode || signUpForm.adminCode !== 'ADMIN2024')) {
-      alert('Invalid admin authorization code');
-      return;
-    }
-    if (targetUserType === 'staff' && !signUpForm.staffId) {
-      alert('Staff ID is required');
-      return;
-    }
-    if (targetUserType === 'restaurant' && (!signUpForm.restaurantCode || signUpForm.restaurantCode !== 'REST2024')) {
-      alert('Invalid restaurant registration code');
-      return;
-    }
-    
-    console.log(`${targetUserType} signing up:`, signUpForm);
-    
-    // Route to appropriate dashboard based on target user type
-    switch (targetUserType) {
-      case 'admin':
-        if (onGoToAdmin) onGoToAdmin();
-        break;
-      case 'staff':
-        if (onGoToStaff) onGoToStaff();
-        break;
-      case 'restaurant':
-        if (onGoToRestaurantDashboard) onGoToRestaurantDashboard();
-        break;
-      case 'customer':
-      default:
-        if (onSignInSuccess) onSignInSuccess('customer');
-        break;
-    }
+    console.log('Customer signing up:', signUpForm);
+    if (onSignInSuccess) onSignInSuccess('customer');
   };
 
   return (
@@ -114,70 +58,61 @@ export default function SignIn({ onBack, onSignInSuccess, onGoToAdmin, onGoToSta
             </Button>
             <div>
               <h1 className="text-2xl font-bold text-primary">Welcome to FrontDash</h1>
-              <p className="text-sm text-muted-foreground">
-                {targetUserType === 'admin' ? 'Admin Portal Access' :
-                 targetUserType === 'staff' ? 'Staff Portal Access' :
-                 targetUserType === 'restaurant' ? 'Restaurant Portal Access' :
-                 'Sign in to your account or create a new one'}
-              </p>
+              <p className="text-sm text-muted-foreground">Sign in to your account or create a new one</p>
             </div>
           </div>
 
-          {/* Navigation Buttons for Specialized Access - Only show for customer mode */}
-          {targetUserType === 'customer' && (
-            <div className="mb-6 space-y-3">
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground mb-3">Specialized Access</p>
-              </div>
-              <div className="grid grid-cols-1 gap-2">
-                <Button
-                  variant="outline"
-                  onClick={onGoToAdminSignIn}
-                  className="w-full justify-between bg-background/50 border-white/20 hover:bg-primary/10 hover:border-primary/50"
-                >
-                  <div className="flex items-center space-x-2">
-                    <Shield className="h-4 w-4 text-primary" />
-                    <span>Admin Portal</span>
-                  </div>
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={onGoToStaffSignIn}
-                  className="w-full justify-between bg-background/50 border-white/20 hover:bg-primary/10 hover:border-primary/50"
-                >
-                  <div className="flex items-center space-x-2">
-                    <Users className="h-4 w-4 text-primary" />
-                    <span>Staff Portal</span>
-                  </div>
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={onGoToRestaurantSignIn}
-                  className="w-full justify-between bg-background/50 border-white/20 hover:bg-primary/10 hover:border-primary/50"
-                >
-                  <div className="flex items-center space-x-2">
-                    <Utensils className="h-4 w-4 text-primary" />
-                    <span>Restaurant Portal</span>
-                  </div>
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-              </div>
+          {/* Navigation Buttons for Specialized Access */}
+          <div className="mb-6 space-y-3">
+            <div className="text-center">
+              <p className="text-sm text-muted-foreground mb-3">Specialized Access</p>
             </div>
-          )}
+            <div className="grid grid-cols-1 gap-2">
+              <Button
+                variant="outline"
+                onClick={onGoToAdminSignIn}
+                className="w-full justify-between bg-background/50 border-white/20 hover:bg-primary/10 hover:border-primary/50"
+              >
+                <div className="flex items-center space-x-2">
+                  <Shield className="h-4 w-4 text-primary" />
+                  <span>Admin Portal</span>
+                </div>
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                onClick={onGoToStaffSignIn}
+                className="w-full justify-between bg-background/50 border-white/20 hover:bg-primary/10 hover:border-primary/50"
+              >
+                <div className="flex items-center space-x-2">
+                  <Users className="h-4 w-4 text-primary" />
+                  <span>Staff Portal</span>
+                </div>
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                onClick={onGoToRestaurantSignIn}
+                className="w-full justify-between bg-background/50 border-white/20 hover:bg-primary/10 hover:border-primary/50"
+              >
+                <div className="flex items-center space-x-2">
+                  <Utensils className="h-4 w-4 text-primary" />
+                  <span>Restaurant Portal</span>
+                </div>
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
 
-          {/* Divider - Only show for customer mode */}
-          {targetUserType === 'customer' && (
-            <div className="relative mb-6">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-white/20" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">Customer Access</span>
-              </div>
+          {/* Divider */}
+          <div className="relative mb-6">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-white/20" />
             </div>
-          )}
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 text-muted-foreground">Customer Access</span>
+            </div>
+          </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-6">
@@ -221,14 +156,8 @@ export default function SignIn({ onBack, onSignInSuccess, onGoToAdmin, onGoToSta
                 </div>
 
                 <Button type="submit" className="w-full bg-primary hover:bg-primary/90 mt-6 frontdash-glow">
-                  {targetUserType === 'admin' && <Shield className="h-4 w-4 mr-2" />}
-                  {targetUserType === 'staff' && <Users className="h-4 w-4 mr-2" />}
-                  {targetUserType === 'restaurant' && <Utensils className="h-4 w-4 mr-2" />}
-                  {targetUserType === 'customer' && <UserCircle className="h-4 w-4 mr-2" />}
-                  Sign In {targetUserType === 'admin' ? 'as Admin' :
-                          targetUserType === 'staff' ? 'as Staff' :
-                          targetUserType === 'restaurant' ? 'as Restaurant Owner' :
-                          'as Customer'}
+                  <UserCircle className="h-4 w-4 mr-2" />
+                  Sign In as Customer
                 </Button>
 
                 <div className="text-center">
@@ -310,81 +239,9 @@ export default function SignIn({ onBack, onSignInSuccess, onGoToAdmin, onGoToSta
                   </div>
                 </div>
 
-                {/* Admin-specific fields */}
-                {targetUserType === 'admin' && (
-                  <div>
-                    <Label htmlFor="signup-admin-code">Admin Authorization Code</Label>
-                    <div className="relative">
-                      <Shield className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="signup-admin-code"
-                        type="text"
-                        value={signUpForm.adminCode}
-                        onChange={(e) => setSignUpForm({ ...signUpForm, adminCode: e.target.value })}
-                        className="pl-10 bg-background/50 border-white/20"
-                        placeholder="Enter admin code"
-                        required
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Contact system administrator for the authorization code
-                    </p>
-                  </div>
-                )}
-
-                {/* Staff-specific fields */}
-                {targetUserType === 'staff' && (
-                  <div>
-                    <Label htmlFor="signup-staff-id">Staff ID</Label>
-                    <div className="relative">
-                      <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="signup-staff-id"
-                        type="text"
-                        value={signUpForm.staffId}
-                        onChange={(e) => setSignUpForm({ ...signUpForm, staffId: e.target.value })}
-                        className="pl-10 bg-background/50 border-white/20"
-                        placeholder="Enter your staff ID"
-                        required
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Provided by your manager or HR department
-                    </p>
-                  </div>
-                )}
-
-                {/* Restaurant-specific fields */}
-                {targetUserType === 'restaurant' && (
-                  <div>
-                    <Label htmlFor="signup-restaurant-code">Restaurant Registration Code</Label>
-                    <div className="relative">
-                      <Utensils className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="signup-restaurant-code"
-                        type="text"
-                        value={signUpForm.restaurantCode}
-                        onChange={(e) => setSignUpForm({ ...signUpForm, restaurantCode: e.target.value })}
-                        className="pl-10 bg-background/50 border-white/20"
-                        placeholder="Enter restaurant code"
-                        required
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Contact FrontDash support for restaurant registration
-                    </p>
-                  </div>
-                )}
-
                 <Button type="submit" className="w-full bg-primary hover:bg-primary/90 mt-6 frontdash-glow">
-                  {targetUserType === 'admin' && <Shield className="h-4 w-4 mr-2" />}
-                  {targetUserType === 'staff' && <Users className="h-4 w-4 mr-2" />}
-                  {targetUserType === 'restaurant' && <Utensils className="h-4 w-4 mr-2" />}
-                  {targetUserType === 'customer' && <UserCircle className="h-4 w-4 mr-2" />}
-                  Create {targetUserType === 'admin' ? 'Admin Account' :
-                         targetUserType === 'staff' ? 'Staff Account' :
-                         targetUserType === 'restaurant' ? 'Restaurant Account' :
-                         'Customer Account'}
+                  <UserCircle className="h-4 w-4 mr-2" />
+                  Create Customer Account
                 </Button>
 
                 <div className="text-center text-xs text-muted-foreground mt-4">

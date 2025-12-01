@@ -10,7 +10,6 @@ import {
   ArrowRight, 
   ArrowLeft, 
   Check, 
-  Upload, 
   MapPin, 
   Phone, 
   Mail, 
@@ -32,8 +31,7 @@ const steps = [
   { id: 1, title: 'Basic Information', description: 'Tell us about your restaurant' },
   { id: 2, title: 'Location & Contact', description: 'Where can customers find you?' },
   { id: 3, title: 'Menu & Pricing', description: 'Showcase your delicious offerings' },
-  { id: 4, title: 'Business Verification', description: 'Verify your business credentials' },
-  { id: 5, title: 'Review & Submit', description: 'Review and submit your application' }
+  { id: 4, title: 'Review & Submit', description: 'Review and submit your application' }
 ];
 
 const cuisineTypes = [
@@ -72,13 +70,7 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
       friday: { open: '', close: '', closed: false },
       saturday: { open: '', close: '', closed: false },
       sunday: { open: '', close: '', closed: false }
-    },
-    
-    // Business Info
-    businessLicense: '',
-    taxId: '',
-    ownerName: '',
-    bankAccount: ''
+    }
   });
 
   const [menuItems, setMenuItems] = useState([
@@ -477,62 +469,6 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
       case 4:
         return (
           <div className="space-y-6">
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Business License Number *</label>
-                <Input
-                  placeholder="Enter your business license number"
-                  value={formData.businessLicense}
-                  onChange={(e) => updateFormData('businessLicense', e.target.value)}
-                  className="bg-card/50 border-white/10"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">Tax ID (EIN) *</label>
-                <Input
-                  placeholder="XX-XXXXXXX"
-                  value={formData.taxId}
-                  onChange={(e) => updateFormData('taxId', e.target.value)}
-                  className="bg-card/50 border-white/10"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">Business Owner Name *</label>
-                <Input
-                  placeholder="Full name of business owner"
-                  value={formData.ownerName}
-                  onChange={(e) => updateFormData('ownerName', e.target.value)}
-                  className="bg-card/50 border-white/10"
-                />
-              </div>
-
-              <Separator className="bg-white/10" />
-
-              <div>
-                <h4 className="font-medium mb-4">Required Documents</h4>
-                <div className="space-y-4">
-                  <div className="border-2 border-dashed border-white/20 rounded-lg p-6 text-center hover:border-primary/50 transition-colors cursor-pointer">
-                    <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">Upload Business License</p>
-                    <p className="text-xs text-muted-foreground">PDF, JPG, PNG up to 5MB</p>
-                  </div>
-                  
-                  <div className="border-2 border-dashed border-white/20 rounded-lg p-6 text-center hover:border-primary/50 transition-colors cursor-pointer">
-                    <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">Upload Food Handler's Permit</p>
-                    <p className="text-xs text-muted-foreground">PDF, JPG, PNG up to 5MB</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 5:
-        return (
-          <div className="space-y-6">
             <div className="text-center mb-8">
               <div className="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Check className="h-8 w-8 text-primary" />
@@ -646,7 +582,7 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
               </Badge>
             </div>
             <Progress value={progress} className="h-2 mb-4" />
-            <div className="grid grid-cols-5 gap-4">
+            <div className="grid grid-cols-4 gap-4">
               {steps.map((step) => (
                 <div key={step.id} className="text-center">
                   <div className={`w-8 h-8 rounded-full mx-auto mb-2 flex items-center justify-center text-sm font-medium ${
