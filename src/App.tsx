@@ -1,23 +1,29 @@
-import React, { useState, Suspense } from 'react';
+import React, { useState } from 'react';
 
-// Lazy load all components
-const Homepage = React.lazy(() => import('./components/Homepage'));
-const Dashboard = React.lazy(() => import('./components/Dashboard'));
-const RestaurantRegistration = React.lazy(() => import('./components/RestaurantRegistration'));
-const RestaurantDashboard = React.lazy(() => import('./components/RestaurantDashboard'));
-const AdminDashboard = React.lazy(() => import('./components/AdminDashboard'));
-const StaffDashboard = React.lazy(() => import('./components/StaffDashboard'));
-const AllRestaurants = React.lazy(() => import('./components/AllRestaurants'));
-const RestaurantMenu = React.lazy(() => import('./components/RestaurantMenu'));
-const Cart = React.lazy(() => import('./components/Cart'));
-const Checkout = React.lazy(() => import('./components/Checkout'));
-const OrderConfirmation = React.lazy(() => import('./components/OrderConfirmation'));
-const Account = React.lazy(() => import('./components/Account'));
-const Settings = React.lazy(() => import('./components/Settings'));
-const SignIn = React.lazy(() => import('./components/SignIn'));
-const RegistrationPending = React.lazy(() => import('./components/RegistrationPending'));
+// Import email service
+import { registerRestaurant, approveRestaurant } from './services/emailService';
 
-// Fallback component for Suspense
+// Import components using ES modules
+import Homepage from './components/Homepage';
+import Dashboard from './components/Dashboard';
+import RestaurantRegistration from './components/RestaurantRegistration';
+import RestaurantDashboard from './components/RestaurantDashboard';
+import AdminDashboard from './components/AdminDashboard';
+import StaffDashboard from './components/StaffDashboard';
+import AllRestaurants from './components/AllRestaurants';
+import RestaurantMenu from './components/RestaurantMenu';
+import Cart from './components/Cart';
+import Checkout from './components/Checkout';
+import OrderConfirmation from './components/OrderConfirmation';
+import Account from './components/Account';
+import Settings from './components/Settings';
+import SignIn from './components/SignIn';
+import AdminSignIn from './components/AdminSignIn';
+import StaffSignIn from './components/StaffSignIn';
+import RestaurantSignIn from './components/RestaurantSignIn';
+import RegistrationPending from './components/RegistrationPending';
+
+// Fallback component in case of import errors
 const ErrorFallback = () => (
   <div className="min-h-screen bg-background flex items-center justify-center">
     <div className="text-center space-y-4">
@@ -44,6 +50,20 @@ export default function App() {
   const [approvedRestaurants, setApprovedRestaurants] = useState<any[]>([]);
   const [currentRegistration, setCurrentRegistration] = useState<any>(null);
 
+  // Safe component renderer
+  const renderComponent = (Component: React.ComponentType<any> | undefined, props: any) => {
+    if (!Component) {
+      return <ErrorFallback />;
+    }
+    
+    try {
+      return <Component {...props} />;
+    } catch (error) {
+      console.error('Error rendering component:', error);
+      return <ErrorFallback />;
+    }
+  };
+
   const handleRestaurantSelect = (restaurant: any) => {
     setSelectedRestaurant(restaurant);
     setCurrentScreen('restaurant-menu');
@@ -56,6 +76,7 @@ export default function App() {
 
   const handleContinueShopping = () => {
     setCurrentScreen('homepage');
+    // Clear search query to show the main "what are you craving" section
     setSearchQuery('');
   };
 
@@ -65,25 +86,54 @@ export default function App() {
     setCurrentScreen('checkout');
   };
 
-  const handleRestaurantRegistrationComplete = (registrationData: any) => {
-    const newRegistration = {
-      id: Date.now(),
-      ...registrationData,
-      status: 'pending',
-      submittedAt: new Date().toISOString().split('T')[0]
-    };
-    setPendingRegistrations(prev => [...prev, newRegistration]);
-    setCurrentRegistration(newRegistration);
-    setCurrentScreen('registration-pending');
+  const handleRestaurantRegistrationComplete = async (registrationData: any) => {
+    // Register restaurant via backend (or mock in dev mode)
+    const result = await registerRestaurant(registrationData);
+    
+    if (result.success) {
+      const newRegistration = {
+        id: result.restaurantId || Date.now(),
+        ...registrationData,
+        status: 'pending',
+        submittedAt: new Date().toISOString().split('T')[0]
+      };
+      setPendingRegistrations(prev => [...prev, newRegistration]);
+      setCurrentRegistration(newRegistration);
+      setCurrentScreen('registration-pending');
+    } else {
+      // Handle registration error
+      console.error('Registration failed:', result.error);
+      alert(`Registration failed: ${result.error || 'Unknown error'}`);
+    }
   };
 
-  const handleApproveRestaurant = (registrationId: number) => {
-    setPendingRegistrations(prev => 
-      prev.filter(reg => reg.id !== registrationId)
-    );
+  const handleApproveRestaurant = async (registrationId: number) => {
     const approvedRegistration = pendingRegistrations.find(reg => reg.id === registrationId);
+    
     if (approvedRegistration) {
-      setApprovedRestaurants(prev => [...prev, { ...approvedRegistration, status: 'approved' }]);
+      // Approve restaurant via backend (or mock in dev mode)
+      const result = await approveRestaurant(
+        registrationId,
+        approvedRegistration.email,
+        approvedRegistration.restaurantName
+      );
+      
+      if (result.success) {
+        // Update restaurant status to approved
+        setPendingRegistrations(prev => 
+          prev.filter(reg => reg.id !== registrationId)
+        );
+        setApprovedRestaurants(prev => [...prev, { 
+          ...approvedRegistration, 
+          status: 'approved',
+          username: result.credentials?.username || approvedRegistration.email,
+          temporaryPassword: result.credentials?.password || '***'
+        }]);
+      } else {
+        // Handle approval error
+        console.error('Approval failed:', result.error);
+        alert(`Approval failed: ${result.error || 'Unknown error'}`);
+      }
     }
   };
 
@@ -93,226 +143,173 @@ export default function App() {
     );
   };
 
-  // Render logic wrapped in Suspense for lazy loading
   return (
     <div className="dark min-h-screen frontdash-animated-bg">
-      <Suspense fallback={<ErrorFallback />}>
-        {currentScreen === 'homepage' && (
-          <Homepage
-            onFindFood={(query: string) => {
-              setSearchQuery(query);
-              setCurrentScreen('all-restaurants');
-            }}
-            onViewAllRestaurants={() => {
-              setSearchQuery('');
-              setCurrentScreen('all-restaurants');
-            }}
-            onRestaurantSelect={handleRestaurantSelect}
-            onRestaurantSignup={() => setCurrentScreen('restaurant-registration')}
-            onGoToAccount={() => setCurrentScreen('account')}
-            onGoToSettings={() => setCurrentScreen('settings')}
-            onGoToSignIn={() => setCurrentScreen('signin')}
-            onViewCart={() => setCurrentScreen('cart')}
-            onGoToRestaurantDashboard={() => setCurrentScreen('restaurant-dashboard')}
-            deliveryAddress={deliveryAddress}
-            onDeliveryAddressChange={setDeliveryAddress}
-          />
-        )}
+      {currentScreen === 'homepage' && renderComponent(Homepage, {
+        onFindFood: (query: string) => {
+          setSearchQuery(query);
+          setCurrentScreen('all-restaurants');
+        },
+        onViewAllRestaurants: () => {
+          setSearchQuery('');
+          setCurrentScreen('all-restaurants');
+        },
+        onRestaurantSelect: handleRestaurantSelect,
+        onRestaurantSignup: () => setCurrentScreen('restaurant-registration'),
+        onGoToAccount: () => setCurrentScreen('account'),
+        onGoToSettings: () => setCurrentScreen('settings'),
+        onGoToSignIn: () => setCurrentScreen('signin'),
+        onViewCart: () => setCurrentScreen('cart'),
+        onGoToRestaurantDashboard: () => setCurrentScreen('restaurant-dashboard'),
+        deliveryAddress,
+        onDeliveryAddressChange: setDeliveryAddress
+      })}
+      
+      {currentScreen === 'dashboard' && renderComponent(Dashboard, {
+        onRestaurantSelect: handleRestaurantSelect,
+        onBackToHomepage: () => setCurrentScreen('homepage'),
+        onGoToAllRestaurants: () => setCurrentScreen('all-restaurants'),
+        onGoToAccount: () => setCurrentScreen('account'),
+        onGoToSettings: () => setCurrentScreen('settings')
+      })}
+      
+      {currentScreen === 'all-restaurants' && renderComponent(AllRestaurants, {
+        onBack: () => setCurrentScreen('homepage'),
+        onRestaurantSelect: handleRestaurantSelect,
+        searchQuery: searchQuery,
+        onRestaurantSignup: () => setCurrentScreen('restaurant-registration'),
+        onViewCart: () => setCurrentScreen('cart'),
+        onGoToAccount: () => setCurrentScreen('account'),
+        onGoToSettings: () => setCurrentScreen('settings'),
+        onGoToSignIn: () => setCurrentScreen('signin'),
+        deliveryAddress,
+        onDeliveryAddressChange: setDeliveryAddress
+      })}
+      
+      {currentScreen === 'restaurant-menu' && selectedRestaurant && renderComponent(RestaurantMenu, {
+        restaurant: selectedRestaurant,
+        onBack: () => setCurrentScreen('all-restaurants'),
+        onViewCart: handleViewCart,
+        onRestaurantSignup: () => setCurrentScreen('restaurant-registration'),
+        onViewAllRestaurants: () => setCurrentScreen('all-restaurants'),
+        onGoToAccount: () => setCurrentScreen('account'),
+        onGoToSettings: () => setCurrentScreen('settings'),
+        onGoToSignIn: () => setCurrentScreen('signin'),
+        deliveryAddress,
+        onDeliveryAddressChange: setDeliveryAddress
+      })}
+      
+      {currentScreen === 'cart' && renderComponent(Cart, {
+        cartItems: cartItems,
+        onBack: handleContinueShopping,
+        onProceedToCheckout: handleProceedToCheckout,
+        onRestaurantSignup: () => setCurrentScreen('restaurant-registration'),
+        onViewAllRestaurants: () => setCurrentScreen('all-restaurants'),
+        onGoToAccount: () => setCurrentScreen('account'),
+        onGoToSettings: () => setCurrentScreen('settings'),
+        onGoToSignIn: () => setCurrentScreen('signin'),
+        deliveryAddress,
+        onDeliveryAddressChange: setDeliveryAddress
+      })}
+      
+      {currentScreen === 'checkout' && renderComponent(Checkout, {
+        cartItems: cartItems,
+        total: orderTotal,
+        onBack: () => setCurrentScreen('cart'),
+        onOrderComplete: () => setCurrentScreen('order-confirmation'),
+        onRestaurantSignup: () => setCurrentScreen('restaurant-registration'),
+        onViewAllRestaurants: () => setCurrentScreen('all-restaurants'),
+        onGoToAccount: () => setCurrentScreen('account'),
+        onGoToSettings: () => setCurrentScreen('settings'),
+        onGoToSignIn: () => setCurrentScreen('signin'),
+        deliveryAddress,
+        onDeliveryAddressChange: setDeliveryAddress
+      })}
+      
+      {currentScreen === 'order-confirmation' && renderComponent(OrderConfirmation, {
+        onBackToHome: () => {
+          setCurrentScreen('homepage');
+          setCartItems([]);
+          setSelectedRestaurant(null);
+          setOrderTotal(0);
+          setSearchQuery(''); // Clear search to show main craving section
+        },
+        onTrackOrder: () => {
+          // For now, just go back to homepage - could implement order tracking later
+          setCurrentScreen('homepage');
+          setCartItems([]);
+          setSelectedRestaurant(null);
+          setOrderTotal(0);
+          setSearchQuery(''); // Clear search to show main craving section
+        }
+      })}
+      
+      {currentScreen === 'restaurant-registration' && renderComponent(RestaurantRegistration, {
+        onComplete: handleRestaurantRegistrationComplete,
+        onBack: () => setCurrentScreen('homepage')
+      })}
+      
+      {currentScreen === 'registration-pending' && renderComponent(RegistrationPending, {
+        registration: currentRegistration,
+        onBack: () => setCurrentScreen('homepage')
+      })}
+      
+      {currentScreen === 'restaurant-dashboard' && renderComponent(RestaurantDashboard, {
+        onBack: () => setCurrentScreen('homepage')
+      })}
+      
+      {currentScreen === 'admin' && renderComponent(AdminDashboard, {
+        onBack: () => setCurrentScreen('homepage'),
+        pendingRegistrations: pendingRegistrations,
+        onApproveRestaurant: handleApproveRestaurant,
+        onRejectRestaurant: handleRejectRestaurant
+      })}
+      
+      {currentScreen === 'staff' && renderComponent(StaffDashboard, {
+        onBack: () => setCurrentScreen('homepage')
+      })}
+      
+      {currentScreen === 'account' && renderComponent(Account, {
+        onBack: () => setCurrentScreen('homepage'),
+        onRestaurantSignup: () => setCurrentScreen('restaurant-registration'),
+        onViewAllRestaurants: () => setCurrentScreen('all-restaurants'),
+        onViewCart: () => setCurrentScreen('cart'),
+        onGoToSettings: () => setCurrentScreen('settings'),
+        onGoToSignIn: () => setCurrentScreen('signin')
+      })}
+      
+      {currentScreen === 'settings' && renderComponent(Settings, {
+        onBack: () => setCurrentScreen('homepage'),
+        onRestaurantSignup: () => setCurrentScreen('restaurant-registration'),
+        onViewAllRestaurants: () => setCurrentScreen('all-restaurants'),
+        onViewCart: () => setCurrentScreen('cart'),
+        onGoToAccount: () => setCurrentScreen('account'),
+        onGoToSignIn: () => setCurrentScreen('signin')
+      })}
+      
+      {currentScreen === 'signin' && renderComponent(SignIn, {
+        onBack: () => setCurrentScreen('homepage'),
+        onSignInSuccess: (userType: string) => setCurrentScreen('homepage'),
+        onGoToAdminSignIn: () => setCurrentScreen('admin'),
+        onGoToStaffSignIn: () => setCurrentScreen('staff'),
+        onGoToRestaurantSignIn: () => setCurrentScreen('restaurant-dashboard')
+      })}
 
-        {currentScreen === 'dashboard' && (
-          <Dashboard
-            onRestaurantSelect={handleRestaurantSelect}
-            onBackToHomepage={() => setCurrentScreen('homepage')}
-            onGoToAllRestaurants={() => setCurrentScreen('all-restaurants')}
-            onGoToAccount={() => setCurrentScreen('account')}
-            onGoToSettings={() => setCurrentScreen('settings')}
-          />
-        )}
+      {currentScreen === 'admin-signin' && renderComponent(AdminSignIn, {
+        onBack: () => setCurrentScreen('signin'),
+        onSignInSuccess: () => setCurrentScreen('admin')
+      })}
 
-        {currentScreen === 'all-restaurants' && (
-          <AllRestaurants
-            onBack={() => setCurrentScreen('homepage')}
-            onRestaurantSelect={handleRestaurantSelect}
-            searchQuery={searchQuery}
-            onRestaurantSignup={() => setCurrentScreen('restaurant-registration')}
-            onViewCart={() => setCurrentScreen('cart')}
-            onGoToAccount={() => setCurrentScreen('account')}
-            onGoToSettings={() => setCurrentScreen('settings')}
-            onGoToSignIn={() => setCurrentScreen('signin')}
-            deliveryAddress={deliveryAddress}
-            onDeliveryAddressChange={setDeliveryAddress}
-          />
-        )}
+      {currentScreen === 'staff-signin' && renderComponent(StaffSignIn, {
+        onBack: () => setCurrentScreen('signin'),
+        onSignInSuccess: () => setCurrentScreen('staff')
+      })}
 
-        {currentScreen === 'restaurant-menu' && selectedRestaurant && (
-          <RestaurantMenu
-            restaurant={selectedRestaurant}
-            onBack={() => setCurrentScreen('all-restaurants')}
-            onViewCart={handleViewCart}
-            onRestaurantSignup={() => setCurrentScreen('restaurant-registration')}
-            onViewAllRestaurants={() => setCurrentScreen('all-restaurants')}
-            onGoToAccount={() => setCurrentScreen('account')}
-            onGoToSettings={() => setCurrentScreen('settings')}
-            onGoToSignIn={() => setCurrentScreen('signin')}
-            deliveryAddress={deliveryAddress}
-            onDeliveryAddressChange={setDeliveryAddress}
-          />
-        )}
+      {currentScreen === 'restaurant-signin' && renderComponent(RestaurantSignIn, {
+        onBack: () => setCurrentScreen('signin'),
+        onSignInSuccess: () => setCurrentScreen('restaurant-dashboard')
+      })}
 
-        {currentScreen === 'cart' && (
-          <Cart
-            cartItems={cartItems}
-            onBack={handleContinueShopping}
-            onProceedToCheckout={handleProceedToCheckout}
-            onRestaurantSignup={() => setCurrentScreen('restaurant-registration')}
-            onViewAllRestaurants={() => setCurrentScreen('all-restaurants')}
-            onGoToAccount={() => setCurrentScreen('account')}
-            onGoToSettings={() => setCurrentScreen('settings')}
-            onGoToSignIn={() => setCurrentScreen('signin')}
-            deliveryAddress={deliveryAddress}
-            onDeliveryAddressChange={setDeliveryAddress}
-          />
-        )}
-
-        {currentScreen === 'checkout' && (
-          <Checkout
-            cartItems={cartItems}
-            total={orderTotal}
-            onBack={() => setCurrentScreen('cart')}
-            onOrderComplete={() => setCurrentScreen('order-confirmation')}
-            onRestaurantSignup={() => setCurrentScreen('restaurant-registration')}
-            onViewAllRestaurants={() => setCurrentScreen('all-restaurants')}
-            onGoToAccount={() => setCurrentScreen('account')}
-            onGoToSettings={() => setCurrentScreen('settings')}
-            onGoToSignIn={() => setCurrentScreen('signin')}
-            deliveryAddress={deliveryAddress}
-            onDeliveryAddressChange={setDeliveryAddress}
-          />
-        )}
-
-        {currentScreen === 'order-confirmation' && (
-          <OrderConfirmation
-            onBackToHome={() => {
-              setCurrentScreen('homepage');
-              setCartItems([]);
-              setSelectedRestaurant(null);
-              setOrderTotal(0);
-              setSearchQuery('');
-            }}
-            onTrackOrder={() => {
-              setCurrentScreen('homepage');
-              setCartItems([]);
-              setSelectedRestaurant(null);
-              setOrderTotal(0);
-              setSearchQuery('');
-            }}
-          />
-        )}
-
-        {currentScreen === 'restaurant-registration' && (
-          <RestaurantRegistration
-            onComplete={handleRestaurantRegistrationComplete}
-            onBack={() => setCurrentScreen('homepage')}
-          />
-        )}
-
-        {currentScreen === 'registration-pending' && (
-          <RegistrationPending
-            registration={currentRegistration}
-            onBack={() => setCurrentScreen('homepage')}
-          />
-        )}
-
-        {currentScreen === 'restaurant-dashboard' && (
-          <RestaurantDashboard
-            onBack={() => setCurrentScreen('homepage')}
-          />
-        )}
-
-        {currentScreen === 'admin' && (
-          <AdminDashboard
-            onBack={() => setCurrentScreen('homepage')}
-            pendingRegistrations={pendingRegistrations}
-            onApproveRestaurant={handleApproveRestaurant}
-            onRejectRestaurant={handleRejectRestaurant}
-          />
-        )}
-
-        {currentScreen === 'staff' && (
-          <StaffDashboard
-            onBack={() => setCurrentScreen('homepage')}
-          />
-        )}
-
-        {currentScreen === 'account' && (
-          <Account
-            onBack={() => setCurrentScreen('homepage')}
-            onRestaurantSignup={() => setCurrentScreen('restaurant-registration')}
-            onViewAllRestaurants={() => setCurrentScreen('all-restaurants')}
-            onViewCart={() => setCurrentScreen('cart')}
-            onGoToSettings={() => setCurrentScreen('settings')}
-            onGoToSignIn={() => setCurrentScreen('signin')}
-          />
-        )}
-
-        {currentScreen === 'settings' && (
-          <Settings
-            onBack={() => setCurrentScreen('homepage')}
-            onRestaurantSignup={() => setCurrentScreen('restaurant-registration')}
-            onViewAllRestaurants={() => setCurrentScreen('all-restaurants')}
-            onViewCart={() => setCurrentScreen('cart')}
-            onGoToAccount={() => setCurrentScreen('account')}
-            onGoToSignIn={() => setCurrentScreen('signin')}
-          />
-        )}
-
-        {currentScreen === 'signin' && (
-          <SignIn
-            onBack={() => setCurrentScreen('homepage')}
-            onSignInSuccess={(userType: string) => setCurrentScreen('homepage')}
-            onGoToAdmin={() => setCurrentScreen('admin')}
-            onGoToStaff={() => setCurrentScreen('staff')}
-            onGoToRestaurantDashboard={() => setCurrentScreen('restaurant-dashboard')}
-            onGoToAdminSignIn={() => setCurrentScreen('admin-signin')}
-            onGoToStaffSignIn={() => setCurrentScreen('staff-signin')}
-            onGoToRestaurantSignIn={() => setCurrentScreen('restaurant-signin')}
-            targetUserType="customer"
-          />
-        )}
-
-        {currentScreen === 'admin-signin' && (
-          <SignIn
-            onBack={() => setCurrentScreen('signin')}
-            onSignInSuccess={(userType: string) => setCurrentScreen('homepage')}
-            onGoToAdmin={() => setCurrentScreen('admin')}
-            onGoToStaff={() => setCurrentScreen('staff')}
-            onGoToRestaurantDashboard={() => setCurrentScreen('restaurant-dashboard')}
-            targetUserType="admin"
-          />
-        )}
-
-        {currentScreen === 'staff-signin' && (
-          <SignIn
-            onBack={() => setCurrentScreen('signin')}
-            onSignInSuccess={(userType: string) => setCurrentScreen('homepage')}
-            onGoToAdmin={() => setCurrentScreen('admin')}
-            onGoToStaff={() => setCurrentScreen('staff')}
-            onGoToRestaurantDashboard={() => setCurrentScreen('restaurant-dashboard')}
-            targetUserType="staff"
-          />
-        )}
-
-        {currentScreen === 'restaurant-signin' && (
-          <SignIn
-            onBack={() => setCurrentScreen('signin')}
-            onSignInSuccess={(userType: string) => setCurrentScreen('homepage')}
-            onGoToAdmin={() => setCurrentScreen('admin')}
-            onGoToStaff={() => setCurrentScreen('staff')}
-            onGoToRestaurantDashboard={() => setCurrentScreen('restaurant-dashboard')}
-            targetUserType="restaurant"
-          />
-        )}
-      </Suspense>
     </div>
   );
 }

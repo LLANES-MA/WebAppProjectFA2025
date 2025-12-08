@@ -1,0 +1,10 @@
+/**
+ * Email Options Type
+ */
+export interface EmailOptions {
+  to: string;
+  subject: string;
+  body: string;
+  html?: string;
+}
+

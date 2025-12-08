@@ -23,13 +23,9 @@ function App() {
 interface SignInProps {
   onBack: () => void;
   onSignInSuccess?: (userType: string) => void;
-  onGoToAdmin?: () => void;
-  onGoToStaff?: () => void;
-  onGoToRestaurantDashboard?: () => void;
   onGoToAdminSignIn?: () => void;
   onGoToStaffSignIn?: () => void;
   onGoToRestaurantSignIn?: () => void;
-  targetUserType?: 'customer' | 'admin' | 'staff' | 'restaurant';
 }
 
 export default function SignIn({ onBack, onSignInSuccess, onGoToAdmin, onGoToStaff, onGoToRestaurantDashboard, onGoToAdminSignIn, onGoToStaffSignIn, onGoToRestaurantSignIn, targetUserType = 'customer' }: SignInProps) {
@@ -167,49 +163,47 @@ export default function SignIn({ onBack, onSignInSuccess, onGoToAdmin, onGoToSta
             </div>
           </div>
 
-          {/* Navigation Buttons for Specialized Access - Only show for customer mode */}
-          {targetUserType === 'customer' && (
-            <div className="mb-6 space-y-3">
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground mb-3">Specialized Access</p>
-              </div>
-              <div className="grid grid-cols-1 gap-2">
-                <Button
-                  variant="outline"
-                  onClick={onGoToAdminSignIn}
-                  className="w-full justify-between bg-background/50 border-white/20 hover:bg-primary/10 hover:border-primary/50"
-                >
-                  <div className="flex items-center space-x-2">
-                    <Shield className="h-4 w-4 text-primary" />
-                    <span>Admin Portal</span>
-                  </div>
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={onGoToStaffSignIn}
-                  className="w-full justify-between bg-background/50 border-white/20 hover:bg-primary/10 hover:border-primary/50"
-                >
-                  <div className="flex items-center space-x-2">
-                    <Users className="h-4 w-4 text-primary" />
-                    <span>Staff Portal</span>
-                  </div>
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={onGoToRestaurantSignIn}
-                  className="w-full justify-between bg-background/50 border-white/20 hover:bg-primary/10 hover:border-primary/50"
-                >
-                  <div className="flex items-center space-x-2">
-                    <Utensils className="h-4 w-4 text-primary" />
-                    <span>Restaurant Portal</span>
-                  </div>
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-              </div>
+          {/* Navigation Buttons for Specialized Access */}
+          <div className="mb-6 space-y-3">
+            <div className="text-center">
+              <p className="text-sm text-muted-foreground mb-3">Specialized Access</p>
             </div>
-          )}
+            <div className="grid grid-cols-1 gap-2">
+              <Button
+                variant="outline"
+                onClick={onGoToAdminSignIn}
+                className="w-full justify-between bg-background/50 border-white/20 hover:bg-primary/10 hover:border-primary/50"
+              >
+                <div className="flex items-center space-x-2">
+                  <Shield className="h-4 w-4 text-primary" />
+                  <span>Admin Portal</span>
+                </div>
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                onClick={onGoToStaffSignIn}
+                className="w-full justify-between bg-background/50 border-white/20 hover:bg-primary/10 hover:border-primary/50"
+              >
+                <div className="flex items-center space-x-2">
+                  <Users className="h-4 w-4 text-primary" />
+                  <span>Staff Portal</span>
+                </div>
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                onClick={onGoToRestaurantSignIn}
+                className="w-full justify-between bg-background/50 border-white/20 hover:bg-primary/10 hover:border-primary/50"
+              >
+                <div className="flex items-center space-x-2">
+                  <Utensils className="h-4 w-4 text-primary" />
+                  <span>Restaurant Portal</span>
+                </div>
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
 
           {/* Sign In Form */}
           {targetUserType !== 'customer' && (
