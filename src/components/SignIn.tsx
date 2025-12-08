@@ -4,7 +4,21 @@ import { Card } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { ArrowLeft, User, Lock, Mail, UserCircle, Shield, Users, Utensils, ArrowRight } from 'lucide-react';
+import { ArrowLeft, User, Lock, Mail, Users, Shield, Utensils, UserCircle, ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+
+function App() {
+  const navigate = useNavigate();
+  
+  return (
+    <SignIn
+      onBack={() => navigate('/')}
+      onGoToAdminSignIn={() => navigate('/admin-signin')}
+      onGoToStaffSignIn={() => navigate('/staff-signin')}
+      onGoToRestaurantSignIn={() => navigate('/restaurant-signin')}
+    />
+  );
+}
 
 interface SignInProps {
   onBack: () => void;
@@ -14,32 +28,114 @@ interface SignInProps {
   onGoToRestaurantSignIn?: () => void;
 }
 
-export default function SignIn({ onBack, onSignInSuccess, onGoToAdminSignIn, onGoToStaffSignIn, onGoToRestaurantSignIn }: SignInProps) {
-  const [signInForm, setSignInForm] = useState({ email: '', password: '' });
-  const [signUpForm, setSignUpForm] = useState({ 
-    name: '', 
-    email: '', 
-    password: '', 
-    confirmPassword: ''
+export default function SignIn({ onBack, onSignInSuccess, onGoToAdmin, onGoToStaff, onGoToRestaurantDashboard, onGoToAdminSignIn, onGoToStaffSignIn, onGoToRestaurantSignIn, targetUserType = 'customer' }: SignInProps) {
+  const [signInForm, setSignInForm] = useState({ username: '', password: '' });
+  const [signUpForm, setSignUpForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    adminCode: '',
+    staffId: '',
+    restaurantCode: ''
   });
   const [activeTab, setActiveTab] = useState('signin');
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
+  // Username validation: min 2 chars + 2 digits (except admin)
+  function validateUsername(username: string, isAdmin: boolean) {
+    if (isAdmin) return '';
+    if (!/^[A-Za-z]{2,}\d{2,}$/.test(username)) {
+      return 'Username must have at least 2 letters followed by at least 2 digits';
+    }
+    return '';
+  }
+
+  // Password validation: min 6 chars, 1 upper, 1 lower, 1 number
+  function validatePassword(password: string) {
+    if (password.length < 6) return 'Password must be at least 6 characters';
+    if (!/[A-Z]/.test(password)) return 'Password must contain an uppercase letter';
+    if (!/[a-z]/.test(password)) return 'Password must contain a lowercase letter';
+    if (!/[0-9]/.test(password)) return 'Password must contain a number';
+    return '';
+  }
 
   const handleSignIn = (e: React.FormEvent) => {
     e.preventDefault();
+    const newErrors: { [key: string]: string } = {};
+    newErrors.username = validateUsername(signInForm.username, targetUserType === 'admin');
+    newErrors.password = validatePassword(signInForm.password);
+    setErrors(newErrors);
+    if (Object.values(newErrors).some(Boolean)) return;
     // Mock sign in - in real app, validate against backend
-    console.log('Customer signing in:', signInForm);
-    if (onSignInSuccess) onSignInSuccess('customer');
+    console.log(`${targetUserType} signing in:`, signInForm);
+
+    // Route to appropriate dashboard based on target user type
+    switch (targetUserType) {
+      case 'admin':
+        if (onGoToAdmin) onGoToAdmin();
+        break;
+      case 'staff':
+        if (onGoToStaff) onGoToStaff();
+        break;
+      case 'restaurant':
+        if (onGoToRestaurantDashboard) onGoToRestaurantDashboard();
+        break;
+      case 'customer':
+      default:
+        if (onSignInSuccess) onSignInSuccess('customer');
+        break;
+    }
   };
 
   const handleSignUp = (e: React.FormEvent) => {
     e.preventDefault();
+    const newErrors: { [key: string]: string } = {};
+    newErrors.email = validateUsername(signUpForm.email, targetUserType === 'admin');
+    newErrors.password = validatePassword(signUpForm.password);
+    if (signUpForm.password !== signUpForm.confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
+    }
+    setErrors(newErrors);
+    if (Object.values(newErrors).some(Boolean)) return;
     // Mock sign up - in real app, create account in backend
     if (signUpForm.password !== signUpForm.confirmPassword) {
       alert('Passwords do not match');
       return;
     }
-    console.log('Customer signing up:', signUpForm);
-    if (onSignInSuccess) onSignInSuccess('customer');
+
+    // Validation for specialized accounts
+    if (targetUserType === 'admin' && (!signUpForm.adminCode || signUpForm.adminCode !== 'ADMIN2024')) {
+      alert('Invalid admin authorization code');
+      return;
+    }
+    if (targetUserType === 'staff' && !signUpForm.staffId) {
+      alert('Staff ID is required');
+      return;
+    }
+    if (targetUserType === 'restaurant' && (!signUpForm.restaurantCode || signUpForm.restaurantCode !== 'REST2024')) {
+      alert('Invalid restaurant registration code');
+      return;
+    }
+
+    console.log(`${targetUserType} signing up:`, signUpForm);
+
+    // Route to appropriate dashboard based on target user type
+    switch (targetUserType) {
+      case 'admin':
+        if (onGoToAdmin) onGoToAdmin();
+        break;
+      case 'staff':
+        if (onGoToStaff) onGoToStaff();
+        break;
+      case 'restaurant':
+        if (onGoToRestaurantDashboard) onGoToRestaurantDashboard();
+        break;
+      case 'customer':
+      default:
+        if (onSignInSuccess) onSignInSuccess('customer');
+        break;
+    }
   };
 
   return (
@@ -58,7 +154,12 @@ export default function SignIn({ onBack, onSignInSuccess, onGoToAdminSignIn, onG
             </Button>
             <div>
               <h1 className="text-2xl font-bold text-primary">Welcome to FrontDash</h1>
-              <p className="text-sm text-muted-foreground">Sign in to your account or create a new one</p>
+              <p className="text-sm text-muted-foreground">
+                {targetUserType === 'admin' ? 'Admin Portal Access' :
+                  targetUserType === 'staff' ? 'Staff Portal Access' :
+                    targetUserType === 'restaurant' ? 'Restaurant Portal Access' :
+                      'Sign in to your account or create a new one'}
+              </p>
             </div>
           </div>
 
@@ -104,161 +205,73 @@ export default function SignIn({ onBack, onSignInSuccess, onGoToAdminSignIn, onG
             </div>
           </div>
 
-          {/* Divider */}
-          <div className="relative mb-6">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-white/20" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-2 text-muted-foreground">Customer Access</span>
-            </div>
-          </div>
-
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-6">
-              <TabsTrigger value="signin">Sign In</TabsTrigger>
-              <TabsTrigger value="signup">Sign Up</TabsTrigger>
-            </TabsList>
-
-            {/* Sign In Form */}
-            <TabsContent value="signin">
-              <form onSubmit={handleSignIn} className="space-y-4">
-                <div>
-                  <Label htmlFor="signin-email">Email</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="signin-email"
-                      type="email"
-                      value={signInForm.email}
-                      onChange={(e) => setSignInForm({ ...signInForm, email: e.target.value })}
-                      className="pl-10 bg-background/50 border-white/20"
-                      placeholder="your@email.com"
-                      required
-                    />
-                  </div>
+          {/* Sign In Form */}
+          {targetUserType !== 'customer' && (
+            <form onSubmit={handleSignIn} className="space-y-4">
+              <div>
+                <Label htmlFor="signin-username">Username</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="signin-username"
+                    type="text"
+                    value={signInForm.username}
+                    onChange={(e) => {
+                      setSignInForm({ ...signInForm, username: e.target.value });
+                      if (errors.username) setErrors(prev => ({ ...prev, username: '' }));
+                    }}
+                    className={`pl-10 bg-background/50 border-white/20${errors.username ? ' border-destructive' : ''}`}
+                    placeholder="Your username"
+                    required
+                  />
                 </div>
+                {errors.username && <p className="text-xs text-destructive mt-1">{errors.username}</p>}
+              </div>
 
-                <div>
-                  <Label htmlFor="signin-password">Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="signin-password"
-                      type="password"
-                      value={signInForm.password}
-                      onChange={(e) => setSignInForm({ ...signInForm, password: e.target.value })}
-                      className="pl-10 bg-background/50 border-white/20"
-                      placeholder="••••••••"
-                      required
-                    />
-                  </div>
+              <div>
+                <Label htmlFor="signin-password">Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="signin-password"
+                    type="password"
+                    value={signInForm.password}
+                    onChange={(e) => {
+                      setSignInForm({ ...signInForm, password: e.target.value });
+                      if (errors.password) setErrors(prev => ({ ...prev, password: '' }));
+                    }}
+                    className={`pl-10 bg-background/50 border-white/20${errors.password ? ' border-destructive' : ''}`}
+                    placeholder="••••••••"
+                    required
+                  />
                 </div>
+                {errors.password && <p className="text-xs text-destructive mt-1">{errors.password}</p>}
+              </div>
 
-                <Button type="submit" className="w-full bg-primary hover:bg-primary/90 mt-6 frontdash-glow">
-                  <UserCircle className="h-4 w-4 mr-2" />
-                  Sign In as Customer
+              <Button type="submit" className="w-full bg-primary hover:bg-primary/90 mt-6 frontdash-glow">
+                {targetUserType === 'admin' && <Shield className="h-4 w-4 mr-2" />}
+                {targetUserType === 'staff' && <Users className="h-4 w-4 mr-2" />}
+                {targetUserType === 'restaurant' && <Utensils className="h-4 w-4 mr-2" />}
+                Sign In {targetUserType === 'admin' ? 'as Admin' :
+                  targetUserType === 'staff' ? 'as Staff' :
+                    targetUserType === 'restaurant' ? 'as Restaurant Owner' :
+                      'as Customer'}
+              </Button>
+
+              <div className="text-center">
+                <Button
+                  type="button"
+                  variant="link"
+                  className="text-sm text-muted-foreground hover:text-primary"
+                >
+                  Forgot your password?
                 </Button>
+              </div>
+            </form>
+          )}
 
-                <div className="text-center">
-                  <Button
-                    type="button"
-                    variant="link"
-                    className="text-sm text-muted-foreground hover:text-primary"
-                  >
-                    Forgot your password?
-                  </Button>
-                </div>
-              </form>
-            </TabsContent>
-
-            {/* Sign Up Form */}
-            <TabsContent value="signup">
-              <form onSubmit={handleSignUp} className="space-y-4">
-                <div>
-                  <Label htmlFor="signup-name">Full Name</Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="signup-name"
-                      type="text"
-                      value={signUpForm.name}
-                      onChange={(e) => setSignUpForm({ ...signUpForm, name: e.target.value })}
-                      className="pl-10 bg-background/50 border-white/20"
-                      placeholder="John Doe"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="signup-email">Email</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="signup-email"
-                      type="email"
-                      value={signUpForm.email}
-                      onChange={(e) => setSignUpForm({ ...signUpForm, email: e.target.value })}
-                      className="pl-10 bg-background/50 border-white/20"
-                      placeholder="your@email.com"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="signup-password">Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="signup-password"
-                      type="password"
-                      value={signUpForm.password}
-                      onChange={(e) => setSignUpForm({ ...signUpForm, password: e.target.value })}
-                      className="pl-10 bg-background/50 border-white/20"
-                      placeholder="••••••••"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="signup-confirm-password">Confirm Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="signup-confirm-password"
-                      type="password"
-                      value={signUpForm.confirmPassword}
-                      onChange={(e) => setSignUpForm({ ...signUpForm, confirmPassword: e.target.value })}
-                      className="pl-10 bg-background/50 border-white/20"
-                      placeholder="••••••••"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <Button type="submit" className="w-full bg-primary hover:bg-primary/90 mt-6 frontdash-glow">
-                  <UserCircle className="h-4 w-4 mr-2" />
-                  Create Customer Account
-                </Button>
-
-                <div className="text-center text-xs text-muted-foreground mt-4">
-                  By creating an account, you agree to our{' '}
-                  <Button variant="link" className="text-xs p-0 h-auto text-primary hover:text-primary/80">
-                    Terms of Service
-                  </Button>{' '}
-                  and{' '}
-                  <Button variant="link" className="text-xs p-0 h-auto text-primary hover:text-primary/80">
-                    Privacy Policy
-                  </Button>
-                </div>
-              </form>
-            </TabsContent>
-          </Tabs>
         </div>
       </Card>
-    </div>
+    </div >
   );
 }
