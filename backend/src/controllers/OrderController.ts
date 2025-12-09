@@ -70,12 +70,23 @@ export class OrderController {
 
   /**
    * GET /api/orders/:id
-   * Get order by ID with items
+   * Get order by ID or order number with items
    */
   async getById(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
-      const orderWithItems = await frontDashMain.orderService.getOrderWithItems(parseInt(id));
+      
+      // Try to parse as number first (order ID), otherwise treat as order number
+      const orderId = parseInt(id);
+      let orderWithItems;
+      
+      if (!isNaN(orderId)) {
+        // It's a numeric ID
+        orderWithItems = await frontDashMain.orderService.getOrderWithItems(orderId);
+      } else {
+        // It's an order number (string)
+        orderWithItems = await frontDashMain.orderService.getOrderWithItemsByNumber(id);
+      }
       
       if (!orderWithItems) {
         res.status(404).json({

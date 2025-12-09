@@ -4,7 +4,8 @@
  */
 export interface Driver {
   driverId: number;
-  name: string;
+  firstName: string;
+  lastName: string;
   isActive: boolean;
 }
 

@@ -14,18 +14,48 @@ export class DriverController {
    */
   async create(req: Request, res: Response): Promise<void> {
     try {
-      const { name, vehicle, license, isActive } = req.body;
+      const { firstName, lastName, name, isActive } = req.body;
 
-      if (!name) {
+      // Support both new format (firstName, lastName) and legacy format (name)
+      let finalFirstName: string;
+      let finalLastName: string;
+
+      if (firstName && lastName) {
+        // New format
+        finalFirstName = firstName.trim();
+        finalLastName = lastName.trim();
+      } else if (name) {
+        // Legacy format: split name into first and last
+        const nameParts = name.trim().split(/\s+/);
+        finalFirstName = nameParts[0] || '';
+        finalLastName = nameParts.slice(1).join(' ') || '';
+        
+        if (!finalLastName) {
+          res.status(400).json({
+            success: false,
+            error: 'Both first name and last name are required. Please provide firstName and lastName, or a full name with at least two words.',
+          });
+          return;
+        }
+      } else {
         res.status(400).json({
           success: false,
-          error: 'name is required',
+          error: 'firstName and lastName are required (or name for legacy support)',
+        });
+        return;
+      }
+
+      if (!finalFirstName || !finalLastName) {
+        res.status(400).json({
+          success: false,
+          error: 'Both first name and last name are required',
         });
         return;
       }
 
       const driver = await frontDashMain.driverService.createDriver(
-        name,
+        finalFirstName,
+        finalLastName,
         isActive !== undefined ? isActive : true
       );
 
@@ -36,6 +66,16 @@ export class DriverController {
       });
     } catch (error: any) {
       console.error('Create driver error:', error);
+      
+      // Check if it's a duplicate error
+      if (error.message && error.message.includes('already exists')) {
+        res.status(409).json({
+          success: false,
+          error: error.message,
+        });
+        return;
+      }
+      
       res.status(500).json({
         success: false,
         error: error.message || 'Failed to create driver',

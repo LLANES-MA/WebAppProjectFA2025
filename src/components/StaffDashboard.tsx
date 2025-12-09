@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
@@ -97,23 +97,42 @@ const availableDrivers = [
 export default function StaffDashboard({ onBack }: StaffDashboardProps) {
   const [activeTab, setActiveTab] = useState("orders");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [loginForm, setLoginForm] = useState({ email: "", password: "" });
+  const [loginForm, setLoginForm] = useState({ username: "", password: "" });
   const [changePasswordForm, setChangePasswordForm] = useState({ 
     currentPassword: "", 
     newPassword: "", 
     confirmPassword: "" 
   });
-  const [searchOrderId, setSearchOrderId] = useState("");
+  const [searchOrderNumber, setSearchOrderNumber] = useState("");
   const [orders, setOrders] = useState<any[]>([]);
   const [drivers, setDrivers] = useState<any[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [restaurantNames, setRestaurantNames] = useState<{ [key: number]: string }>({});
-  const [orderDrivers, setOrderDrivers] = useState<{ [key: number]: { name: string; id: number } }>({});
+  const [orderDrivers, setOrderDrivers] = useState<{ [key: number]: { name: string; id: number; firstName?: string; lastName?: string } }>({});
   
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+  const API_BASE_URL = (import.meta as unknown as { env: { VITE_API_BASE_URL?: string } }).env.VITE_API_BASE_URL || 'http://localhost:8080/api';
   
+  // Test backend connection on mount
+  useEffect(() => {
+    const testConnection = async () => {
+      try {
+        const healthUrl = API_BASE_URL.replace('/api', '/health');
+        const response = await fetch(healthUrl);
+        if (response.ok) {
+          console.log('✅ Backend connection successful');
+        } else {
+          console.warn('⚠️ Backend health check failed');
+        }
+      } catch (err) {
+        console.error('❌ Backend connection failed:', err);
+        setError('Cannot connect to backend server. Please ensure it is running on port 8080.');
+      }
+    };
+    testConnection();
+  }, []);
+
   // Fetch orders and drivers when logged in
   useEffect(() => {
     if (isLoggedIn) {
@@ -135,20 +154,22 @@ export default function StaffDashboard({ onBack }: StaffDashboardProps) {
         const restaurantIds = [...new Set(ordersList.map((o: any) => o.restaurantId))];
         const restaurantNamesMap: { [key: number]: string } = {};
         for (const id of restaurantIds) {
+          const restaurantId = Number(id);
+          if (isNaN(restaurantId)) continue;
           try {
-            const resResponse = await fetch(`${API_BASE_URL}/restaurants/${id}`);
+            const resResponse = await fetch(`${API_BASE_URL}/restaurants/${restaurantId}`);
             if (resResponse.ok) {
               const resData = await resResponse.json();
-              restaurantNamesMap[id] = resData.restaurant?.restaurantName || 'Unknown Restaurant';
+              restaurantNamesMap[restaurantId] = resData.restaurant?.restaurantName || 'Unknown Restaurant';
             }
           } catch (err) {
-            restaurantNamesMap[id] = 'Unknown Restaurant';
+            restaurantNamesMap[restaurantId] = 'Unknown Restaurant';
           }
         }
         setRestaurantNames(restaurantNamesMap);
         
         // Fetch driver assignments for all orders
-        const driverMap: { [key: number]: { name: string; id: number } } = {};
+        const driverMap: { [key: number]: { name: string; id: number; firstName?: string; lastName?: string } } = {};
         for (const order of ordersList) {
           try {
             const deliveryResponse = await fetch(`${API_BASE_URL}/deliveries/order/${order.orderId}`);
@@ -160,9 +181,15 @@ export default function StaffDashboard({ onBack }: StaffDashboardProps) {
                   const driverResponse = await fetch(`${API_BASE_URL}/drivers/${assignment.driverId}`);
                   if (driverResponse.ok) {
                     const driverData = await driverResponse.json();
+                    const driver = driverData.driver;
+                    const driverName = driver?.firstName && driver?.lastName
+                      ? `${driver.firstName} ${driver.lastName}`
+                      : driver?.name || 'Unknown Driver';
                     driverMap[order.orderId] = {
-                      name: driverData.driver?.name || 'Unknown Driver',
+                      name: driverName,
                       id: assignment.driverId,
+                      firstName: driver?.firstName,
+                      lastName: driver?.lastName,
                     };
                   }
                 }
@@ -196,9 +223,9 @@ export default function StaffDashboard({ onBack }: StaffDashboardProps) {
     }
   };
   
-  const fetchOrderDetails = async (orderId: number) => {
+  const fetchOrderDetails = async (orderNumber: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/orders/${orderId}`);
+      const response = await fetch(`${API_BASE_URL}/orders/${orderNumber}`);
       if (response.ok) {
         const data = await response.json();
         return { order: data.order, items: data.items || [] };
@@ -214,31 +241,49 @@ export default function StaffDashboard({ onBack }: StaffDashboardProps) {
     e.preventDefault();
     try {
       setLoading(true);
+      setError(null);
+      
+      console.log('Attempting login to:', `${API_BASE_URL}/auth/staff/login`);
+      console.log('Login data:', { username: loginForm.username, password: '***' });
+      
       const response = await fetch(`${API_BASE_URL}/auth/staff/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          username: loginForm.email,
+          username: loginForm.username,
           password: loginForm.password,
         }),
       });
       
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+      
       if (response.ok) {
         const data = await response.json();
+        console.log('Login successful:', data);
         setIsLoggedIn(true);
-        localStorage.setItem('staffUsername', loginForm.email);
+        localStorage.setItem('staffUsername', loginForm.username);
         // Fetch orders and drivers
         await fetchOrders();
         await fetchDrivers();
       } else {
-        const errorData = await response.json();
-        alert(errorData.error || 'Login failed');
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (parseError) {
+          errorData = { error: `Server error: ${response.status} ${response.statusText}` };
+        }
+        const errorMessage = errorData.error || 'Login failed';
+        setError(errorMessage);
+        alert(errorMessage);
       }
     } catch (err: any) {
       console.error('Login error:', err);
-      alert('Login failed: ' + err.message);
+      const errorMessage = err.message || 'Failed to connect to server. Please ensure the backend is running.';
+      setError(errorMessage);
+      alert('Login failed: ' + errorMessage);
     } finally {
       setLoading(false);
     }
@@ -246,7 +291,7 @@ export default function StaffDashboard({ onBack }: StaffDashboardProps) {
 
   const handleLogout = () => {
     setIsLoggedIn(false);
-    setLoginForm({ email: "", password: "" });
+    setLoginForm({ username: "", password: "" });
   };
 
   const handleChangePassword = (e: React.FormEvent) => {
@@ -261,56 +306,76 @@ export default function StaffDashboard({ onBack }: StaffDashboardProps) {
   };
 
   const handleSearchOrder = async () => {
+    if (!searchOrderNumber.trim()) {
+      alert('Please enter an order number');
+      return;
+    }
+    
     try {
-      // Try to parse as order ID
-      const orderId = parseInt(searchOrderId);
-      if (isNaN(orderId)) {
-        alert("Please enter a valid order ID");
-        return;
-      }
+      setLoading(true);
+      setError(null);
+      const orderNumber = searchOrderNumber.trim();
+      const orderData = await fetchOrderDetails(orderNumber);
       
-      const orderData = await fetchOrderDetails(orderId);
-      if (orderData) {
-        // Fetch delivery assignment if exists
-        const deliveryResponse = await fetch(`${API_BASE_URL}/deliveries/order/${orderId}`);
-        let delivery = null;
-        if (deliveryResponse.ok) {
-          const deliveryData = await deliveryResponse.json();
-          if (deliveryData.assignments && deliveryData.assignments.length > 0) {
-            delivery = deliveryData.assignments[0];
-            // Fetch driver info
-            if (delivery.driverId) {
-              const driverResponse = await fetch(`${API_BASE_URL}/drivers/${delivery.driverId}`);
-              if (driverResponse.ok) {
-                const driverData = await driverResponse.json();
-                delivery.driver = driverData.driver;
+      if (orderData && orderData.order) {
+        // Fetch delivery assignment if exists (using orderId from fetched order)
+        const orderId = orderData.order.orderId;
+        let delivery: any = null;
+        
+        try {
+          const deliveryResponse = await fetch(`${API_BASE_URL}/deliveries/order/${orderId}`);
+          if (deliveryResponse.ok) {
+            const deliveryData = await deliveryResponse.json();
+            if (deliveryData.assignments && deliveryData.assignments.length > 0) {
+              delivery = deliveryData.assignments[0];
+              // Fetch driver info
+              if (delivery && delivery.driverId) {
+                const driverResponse = await fetch(`${API_BASE_URL}/drivers/${delivery.driverId}`);
+                if (driverResponse.ok) {
+                  const driverData = await driverResponse.json();
+                  if (delivery) {
+                    delivery.driver = driverData.driver;
+                  }
+                }
               }
             }
           }
+        } catch (deliveryErr) {
+          console.error('Error fetching delivery:', deliveryErr);
+          // Continue without delivery info
         }
         
         // Fetch restaurant info
-        let restaurant = null;
+        let restaurant: any = null;
         if (orderData.order.restaurantId) {
-          const restaurantResponse = await fetch(`${API_BASE_URL}/restaurants/${orderData.order.restaurantId}`);
-          if (restaurantResponse.ok) {
-            const restaurantData = await restaurantResponse.json();
-            restaurant = restaurantData.restaurant;
+          try {
+            const restaurantResponse = await fetch(`${API_BASE_URL}/restaurants/${orderData.order.restaurantId}`);
+            if (restaurantResponse.ok) {
+              const restaurantData = await restaurantResponse.json();
+              restaurant = restaurantData.restaurant;
+            }
+          } catch (restaurantErr) {
+            console.error('Error fetching restaurant:', restaurantErr);
+            // Continue without restaurant info
           }
         }
         
         setSelectedOrder({
           ...orderData.order,
-          items: orderData.items,
-          restaurant: restaurant?.restaurantName || 'Unknown Restaurant',
+          items: orderData.items || [],
+          restaurant: restaurant?.restaurantName || restaurant?.name || 'Unknown Restaurant',
           delivery: delivery,
         });
       } else {
-        alert("Order not found!");
+        setError('Order not found. Please check the order number and try again.');
+        setSelectedOrder(null);
       }
     } catch (err: any) {
       console.error('Search error:', err);
-      alert('Failed to search order: ' + err.message);
+      setError('Failed to search order: ' + (err.message || 'Unknown error'));
+      setSelectedOrder(null);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -429,16 +494,26 @@ export default function StaffDashboard({ onBack }: StaffDashboardProps) {
           </div>
           
           <form onSubmit={handleLogin} className="space-y-6">
+            {error && (
+              <div className="p-3 rounded-md bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                {error}
+              </div>
+            )}
+            
             <div>
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="username">Username</Label>
               <Input
-                id="email"
-                type="email"
-                value={loginForm.email}
-                onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
+                id="username"
+                type="text"
+                value={loginForm.username}
+                onChange={(e) => {
+                  setLoginForm({ ...loginForm, username: e.target.value });
+                  setError(null); // Clear error when user types
+                }}
                 className="bg-background/50 border-white/20"
-                placeholder="staff@frontdash.com"
+                placeholder="Enter your username (e.g., smith01)"
                 required
+                disabled={loading}
               />
             </div>
             
@@ -448,15 +523,23 @@ export default function StaffDashboard({ onBack }: StaffDashboardProps) {
                 id="password"
                 type="password"
                 value={loginForm.password}
-                onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                onChange={(e) => {
+                  setLoginForm({ ...loginForm, password: e.target.value });
+                  setError(null); // Clear error when user types
+                }}
                 className="bg-background/50 border-white/20"
                 placeholder="••••••••"
                 required
+                disabled={loading}
               />
             </div>
             
-            <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
-              Sign In
+            <Button 
+              type="submit" 
+              className="w-full bg-primary hover:bg-primary/90"
+              disabled={loading}
+            >
+              {loading ? 'Signing in...' : 'Sign In'}
             </Button>
           </form>
 
@@ -548,7 +631,7 @@ export default function StaffDashboard({ onBack }: StaffDashboardProps) {
                     <Table>
                       <TableHeader>
                         <TableRow className="border-white/10">
-                          <TableHead>Order ID</TableHead>
+                          <TableHead>Order Number</TableHead>
                           <TableHead>Restaurant</TableHead>
                           <TableHead>Customer</TableHead>
                           <TableHead>Status</TableHead>
@@ -583,11 +666,15 @@ export default function StaffDashboard({ onBack }: StaffDashboardProps) {
                             const orderStatus = order.orderStatus || order.status;
                             const customerCode = order.uniqueCustomerCode ? `Customer #${order.uniqueCustomerCode}` : 'Guest';
                             const driverInfo = orderDrivers[order.orderId];
-                            const driverName = driverInfo ? driverInfo.name : "Unassigned";
+                            const driverName = driverInfo 
+                              ? (driverInfo.firstName && driverInfo.lastName 
+                                  ? `${driverInfo.firstName} ${driverInfo.lastName}`
+                                  : driverInfo.name || "Unassigned")
+                              : "Unassigned";
                             
                             return (
                               <TableRow key={order.orderId} className="border-white/10">
-                                <TableCell className="font-medium">#{order.orderId}</TableCell>
+                                <TableCell className="font-medium">{order.orderNumber || `#${order.orderId}`}</TableCell>
                                 <TableCell>{restaurantName}</TableCell>
                                 <TableCell>{customerCode}</TableCell>
                                 <TableCell>
@@ -620,12 +707,21 @@ export default function StaffDashboard({ onBack }: StaffDashboardProps) {
                                               drivers.map((driver: any) => (
                                                 <div key={driver.driverId} className="flex items-center justify-between p-3 border border-white/10 rounded-lg">
                                                   <div>
-                                                    <p className="font-medium">{driver.name}</p>
+                                                    <p className="font-medium">
+                                                      {driver.firstName && driver.lastName 
+                                                        ? `${driver.firstName} ${driver.lastName}`
+                                                        : driver.name || 'Unknown Driver'}
+                                                    </p>
                                                     <p className="text-sm text-muted-foreground">{driver.vehicle || 'N/A'}</p>
                                                   </div>
                                                   <Button
                                                     size="sm"
-                                                    onClick={() => handleAssignDriver(order.orderId, driver.driverId, driver.name)}
+                                                    onClick={() => {
+                                                      const fullName = driver.firstName && driver.lastName 
+                                                        ? `${driver.firstName} ${driver.lastName}`
+                                                        : driver.name || 'Unknown Driver';
+                                                      handleAssignDriver(order.orderId, driver.driverId, fullName);
+                                                    }}
                                                     className="bg-primary hover:bg-primary/90"
                                                   >
                                                     Assign
@@ -696,49 +792,118 @@ export default function StaffDashboard({ onBack }: StaffDashboardProps) {
                 <Card className="bg-card/80 backdrop-blur-sm border-white/10 mb-6">
                   <div className="p-6">
                     <h3 className="text-lg font-medium mb-4">Search Order</h3>
-                    <div className="flex gap-4 mb-4">
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      handleSearchOrder();
+                    }} className="flex gap-4 mb-4">
                       <Input
-                        placeholder="Enter Order ID (e.g., ORD001)"
-                        value={searchOrderId}
-                        onChange={(e) => setSearchOrderId(e.target.value)}
+                        placeholder="Enter Order Number (e.g., FD123ABC)"
+                        value={searchOrderNumber}
+                        onChange={(e) => {
+                          setSearchOrderNumber(e.target.value);
+                          setSelectedOrder(null); // Clear previous results when typing
+                          setError(null); // Clear error when typing
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleSearchOrder();
+                          }
+                        }}
                         className="bg-background/50 border-white/20"
+                        disabled={loading}
                       />
-                      <Button onClick={handleSearchOrder} className="bg-primary hover:bg-primary/90">
+                      <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={loading}>
                         <Search className="h-4 w-4 mr-2" />
-                        Search
+                        {loading ? 'Searching...' : 'Search'}
                       </Button>
-                    </div>
+                    </form>
+                    
+                    {error && (
+                      <div className="p-3 rounded-md bg-red-500/10 border border-red-500/20 text-red-400 text-sm mb-4">
+                        {error}
+                      </div>
+                    )}
                     
                     {selectedOrder && (
-                      <Card className="bg-background/50 border-white/10 p-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <h4 className="font-medium mb-2">Order Details</h4>
-                            <p><strong>Order ID:</strong> {selectedOrder.id}</p>
-                            <p><strong>Restaurant:</strong> {selectedOrder.restaurant}</p>
-                            <p><strong>Order Time:</strong> {selectedOrder.orderTime}</p>
-                            <p><strong>Status:</strong> <Badge className={`${getStatusColor(selectedOrder.status)} text-white ml-2`}>{selectedOrder.status}</Badge></p>
+                      <Card className="bg-background/50 border-white/10 p-4 mt-4">
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between mb-4">
+                            <h4 className="text-lg font-semibold">Order Details</h4>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setSelectedOrder(null)}
+                              className="text-muted-foreground hover:text-foreground"
+                            >
+                              Clear
+                            </Button>
                           </div>
-                          <div>
-                            <h4 className="font-medium mb-2">Customer Info</h4>
-                            <p><User className="h-4 w-4 inline mr-2" />{selectedOrder.customer}</p>
-                            <p><Phone className="h-4 w-4 inline mr-2" />{selectedOrder.phone}</p>
-                            <p><MapPin className="h-4 w-4 inline mr-2" />{selectedOrder.address}</p>
+                          
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <h5 className="font-medium mb-2 text-sm text-muted-foreground">Order Information</h5>
+                              <p className="mb-1"><strong>Order Number:</strong> {selectedOrder.orderNumber || `#${selectedOrder.orderId}`}</p>
+                              <p className="mb-1"><strong>Restaurant:</strong> {selectedOrder.restaurant || 'Unknown'}</p>
+                              <p className="mb-1"><strong>Order Time:</strong> {selectedOrder.orderTime ? new Date(selectedOrder.orderTime).toLocaleString() : 'N/A'}</p>
+                              <p className="mb-1"><strong>Status:</strong> <Badge className={`${getStatusColor(selectedOrder.orderStatus || selectedOrder.status)} text-white ml-2`}>{selectedOrder.orderStatus || selectedOrder.status}</Badge></p>
+                            </div>
+                            <div>
+                              <h5 className="font-medium mb-2 text-sm text-muted-foreground">Customer Information</h5>
+                              <p className="mb-1"><User className="h-4 w-4 inline mr-2" />{selectedOrder.customer || 'Guest Customer'}</p>
+                              {selectedOrder.phone && <p className="mb-1"><Phone className="h-4 w-4 inline mr-2" />{selectedOrder.phone}</p>}
+                              {selectedOrder.address && <p className="mb-1"><MapPin className="h-4 w-4 inline mr-2" />{selectedOrder.address}</p>}
+                            </div>
                           </div>
-                          <div>
-                            <h4 className="font-medium mb-2">Items</h4>
-                            <ul className="text-sm space-y-1">
-                              {selectedOrder.items.map((item: string, index: number) => (
-                                <li key={index}>• {item}</li>
-                              ))}
-                            </ul>
-                            <p className="font-medium mt-2">Total: {selectedOrder.total}</p>
+                          
+                          <div className="mt-4">
+                            <h5 className="font-medium mb-2 text-sm text-muted-foreground">Order Items</h5>
+                            {selectedOrder.items && selectedOrder.items.length > 0 ? (
+                              <div className="space-y-2">
+                                {selectedOrder.items.map((item: any, index: number) => (
+                                  <div key={index} className="flex justify-between items-center p-2 bg-background/30 rounded">
+                                    <div>
+                                      <p className="font-medium">{item.itemName || item.name || `Item ${index + 1}`}</p>
+                                      {item.quantity && <p className="text-sm text-muted-foreground">Quantity: {item.quantity}</p>}
+                                    </div>
+                                    <p className="font-medium">${((item.itemPrice || item.price || 0) * (item.quantity || 1)).toFixed(2)}</p>
+                                  </div>
+                                ))}
+                                <div className="mt-3 pt-3 border-t border-white/10">
+                                  <div className="flex justify-between mb-1">
+                                    <span>Subtotal:</span>
+                                    <span>${(selectedOrder.subtotal || 0).toFixed(2)}</span>
+                                  </div>
+                                  {selectedOrder.tip > 0 && (
+                                    <div className="flex justify-between mb-1">
+                                      <span>Tip:</span>
+                                      <span>${(selectedOrder.tip || 0).toFixed(2)}</span>
+                                    </div>
+                                  )}
+                                  <div className="flex justify-between font-bold text-lg mt-2">
+                                    <span>Total:</span>
+                                    <span>${(selectedOrder.grandTotal || selectedOrder.total || 0).toFixed(2)}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-muted-foreground">No items found</p>
+                            )}
                           </div>
-                          <div>
-                            <h4 className="font-medium mb-2">Delivery Info</h4>
-                            <p><strong>Estimated:</strong> {selectedOrder.estimatedDelivery}</p>
-                            <p><strong>Driver:</strong> {selectedOrder.driver || "Unassigned"}</p>
-                          </div>
+                          
+                          {selectedOrder.delivery && (
+                            <div className="mt-4">
+                              <h5 className="font-medium mb-2 text-sm text-muted-foreground">Delivery Information</h5>
+                              <p><strong>Driver:</strong> {selectedOrder.delivery.driver ? 
+                                (selectedOrder.delivery.driver.firstName && selectedOrder.delivery.driver.lastName 
+                                  ? `${selectedOrder.delivery.driver.firstName} ${selectedOrder.delivery.driver.lastName}`
+                                  : selectedOrder.delivery.driver.name || 'Unknown')
+                                : "Unassigned"}</p>
+                              {selectedOrder.delivery.deliveryStatus && (
+                                <p><strong>Delivery Status:</strong> {selectedOrder.delivery.deliveryStatus}</p>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </Card>
                     )}

@@ -33,8 +33,11 @@ export default function AdminDashboard({
   const [activeTab, setActiveTab] = useState("drivers");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });
-  const [newStaffForm, setNewStaffForm] = useState({ username: "", firstName: "", lastName: "", password: "" });
-  const [newDriverForm, setNewDriverForm] = useState({ name: "" });
+  const [newStaffForm, setNewStaffForm] = useState({ firstName: "", lastName: "" });
+  const [staffDialogOpen, setStaffDialogOpen] = useState(false);
+  const [createdStaffInfo, setCreatedStaffInfo] = useState<{ username: string; password: string; name: string } | null>(null);
+  const [newDriverForm, setNewDriverForm] = useState({ firstName: "", lastName: "" });
+  const [driverDialogOpen, setDriverDialogOpen] = useState(false);
   const [selectedRegistration, setSelectedRegistration] = useState<any>(null);
   const [pendingRegistrations, setPendingRegistrations] = useState<any[]>(propPendingRegistrations);
   const [approvedRestaurants, setApprovedRestaurants] = useState<any[]>([]);
@@ -48,29 +51,29 @@ export default function AdminDashboard({
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
 
   // Fetch all data from API
-  useEffect(() => {
-    async function fetchAllData() {
-      try {
-        setLoading(true);
-        const [pending, approved, withdrawalsData, staffData, driversData] = await Promise.all([
-          getPendingRestaurants(),
-          getApprovedRestaurants(),
-          fetch(`${API_BASE_URL}/admin/restaurants/withdrawals`).then(r => r.json()),
-          fetch(`${API_BASE_URL}/staff`).then(r => r.json()),
-          fetch(`${API_BASE_URL}/drivers`).then(r => r.json()),
-        ]);
-        setPendingRegistrations(pending);
-        setApprovedRestaurants(approved);
-        setPendingWithdrawals(withdrawalsData.withdrawals || []);
-        setStaffMembers(staffData.staff || []);
-        setDrivers(driversData.drivers || []);
-      } catch (err: any) {
-        console.error('Error fetching data:', err);
-      } finally {
-        setLoading(false);
-      }
+  const fetchAllData = async () => {
+    try {
+      setLoading(true);
+      const [pending, approved, withdrawalsData, staffData, driversData] = await Promise.all([
+        getPendingRestaurants(),
+        getApprovedRestaurants(),
+        fetch(`${API_BASE_URL}/admin/restaurants/withdrawals`).then(r => r.json()),
+        fetch(`${API_BASE_URL}/staff`).then(r => r.json()),
+        fetch(`${API_BASE_URL}/drivers`).then(r => r.json()),
+      ]);
+      setPendingRegistrations(pending);
+      setApprovedRestaurants(approved);
+      setPendingWithdrawals(withdrawalsData.withdrawals || []);
+      setStaffMembers(staffData.staff || []);
+      setDrivers(driversData.drivers || []);
+    } catch (err: any) {
+      console.error('Error fetching data:', err);
+    } finally {
+      setLoading(false);
     }
+  };
 
+  useEffect(() => {
     if (isLoggedIn) {
       fetchAllData();
     }
@@ -222,8 +225,12 @@ export default function AdminDashboard({
   const handleAddStaff = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      if (!newStaffForm.username || !newStaffForm.password) {
-        alert('Username and password are required');
+      if (!newStaffForm.firstName || !newStaffForm.firstName.trim()) {
+        alert('First name is required');
+        return;
+      }
+      if (!newStaffForm.lastName || !newStaffForm.lastName.trim()) {
+        alert('Last name is required');
         return;
       }
       
@@ -233,19 +240,30 @@ export default function AdminDashboard({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          username: newStaffForm.username,
-          password: newStaffForm.password,
-          firstName: newStaffForm.firstName || undefined,
-          lastName: newStaffForm.lastName || undefined,
+          firstName: newStaffForm.firstName.trim(),
+          lastName: newStaffForm.lastName.trim(),
         }),
       });
       
       if (response.ok) {
         const result = await response.json();
-        alert(`Staff member created successfully! Username: ${newStaffForm.username}`);
-        setNewStaffForm({ username: "", firstName: "", lastName: "", password: "" });
-        // Refresh staff list
+        // Store the created staff info to display
+        setCreatedStaffInfo({
+          username: result.username,
+          password: result.password,
+          name: `${newStaffForm.firstName} ${newStaffForm.lastName}`,
+        });
+        
+        // Add the new staff to the state immediately
+        if (result.staff) {
+          setStaffMembers(prevStaff => [...prevStaff, result.staff]);
+        }
+        
+        // Refresh all data to ensure consistency
         await fetchAllData();
+        
+        // Reset form but keep dialog open to show credentials
+        setNewStaffForm({ firstName: "", lastName: "" });
       } else {
         const errorData = await response.json();
         alert(errorData.error || 'Failed to create staff');
@@ -268,8 +286,12 @@ export default function AdminDashboard({
 
   const handleHireDriver = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newDriverForm.name.trim()) {
-      alert('Driver name is required');
+    if (!newDriverForm.firstName.trim()) {
+      alert('First name is required');
+      return;
+    }
+    if (!newDriverForm.lastName.trim()) {
+      alert('Last name is required');
       return;
     }
     
@@ -280,16 +302,28 @@ export default function AdminDashboard({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          name: newDriverForm.name.trim(),
+          firstName: newDriverForm.firstName.trim(),
+          lastName: newDriverForm.lastName.trim(),
           isActive: true,
         }),
       });
       
       if (response.ok) {
-        alert('Driver hired successfully!');
-        setNewDriverForm({ name: "" });
-        // Refresh drivers list
+        const data = await response.json();
+        const newDriver = data.driver;
+        
+        // Add the new driver to the state immediately
+        if (newDriver) {
+          setDrivers(prevDrivers => [...prevDrivers, newDriver]);
+        }
+        
+        // Also refresh all data to ensure consistency
         await fetchAllData();
+        
+        // Close dialog and reset form
+        setDriverDialogOpen(false);
+        setNewDriverForm({ firstName: "", lastName: "" });
+        alert('Driver hired successfully!');
       } else {
         const errorData = await response.json();
         alert(errorData.error || 'Failed to hire driver');
@@ -450,7 +484,7 @@ export default function AdminDashboard({
             <TabsContent value="drivers" className="space-y-6 mt-0">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold">Driver Management</h2>
-                <Dialog>
+                <Dialog open={driverDialogOpen} onOpenChange={setDriverDialogOpen}>
                   <DialogTrigger asChild>
                     <Button className="bg-primary hover:bg-primary/90">
                       <Car className="h-4 w-4 mr-2" />
@@ -466,18 +500,29 @@ export default function AdminDashboard({
                     </DialogHeader>
                     <form onSubmit={handleHireDriver} className="space-y-4">
                       <div>
-                        <Label htmlFor="driverName">Driver Name *</Label>
+                        <Label htmlFor="driverFirstName">First Name *</Label>
                         <Input
-                          id="driverName"
-                          value={newDriverForm.name}
-                          onChange={(e) => setNewDriverForm({ name: e.target.value })}
+                          id="driverFirstName"
+                          value={newDriverForm.firstName}
+                          onChange={(e) => setNewDriverForm({ ...newDriverForm, firstName: e.target.value })}
                           className="bg-background/50 border-white/20"
-                          placeholder="Enter driver's full name"
+                          placeholder="Enter first name"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="driverLastName">Last Name *</Label>
+                        <Input
+                          id="driverLastName"
+                          value={newDriverForm.lastName}
+                          onChange={(e) => setNewDriverForm({ ...newDriverForm, lastName: e.target.value })}
+                          className="bg-background/50 border-white/20"
+                          placeholder="Enter last name"
                           required
                         />
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Note: Vehicle and license information can be added later if needed.
+                        Note: Duplicate names (same first and last name) are not allowed. Vehicle and license information can be added later if needed.
                       </p>
                       <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
                         Hire Driver
@@ -525,7 +570,9 @@ export default function AdminDashboard({
                                 #{driver.driverId}
                               </TableCell>
                               <TableCell className={`font-medium ${isDeactivated ? 'text-muted-foreground' : ''}`}>
-                                {driver.name}
+                                {driver.firstName && driver.lastName 
+                                  ? `${driver.firstName} ${driver.lastName}`
+                                  : driver.name || 'Unknown Driver'}
                               </TableCell>
                               <TableCell>
                                 <Badge 
@@ -612,7 +659,13 @@ export default function AdminDashboard({
             <TabsContent value="staff" className="space-y-6 mt-0">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold">Staff Management</h2>
-                <Dialog>
+                <Dialog open={staffDialogOpen} onOpenChange={(open) => {
+                  setStaffDialogOpen(open);
+                  if (!open) {
+                    setCreatedStaffInfo(null);
+                    setNewStaffForm({ firstName: "", lastName: "" });
+                  }
+                }}>
                   <DialogTrigger asChild>
                     <Button className="bg-primary hover:bg-primary/90">
                       <UserPlus className="h-4 w-4 mr-2" />
@@ -626,56 +679,92 @@ export default function AdminDashboard({
                         Fill out the form below to add a new staff member to your team.
                       </DialogDescription>
                     </DialogHeader>
-                    <form onSubmit={handleAddStaff} className="space-y-4">
-                      <div>
-                        <Label htmlFor="staffUsername">Username *</Label>
-                        <Input
-                          id="staffUsername"
-                          value={newStaffForm.username}
-                          onChange={(e) => setNewStaffForm({ ...newStaffForm, username: e.target.value })}
-                          className="bg-background/50 border-white/20"
-                          placeholder="Enter username (e.g., staff001)"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="staffPassword">Password *</Label>
-                        <Input
-                          id="staffPassword"
-                          type="password"
-                          value={newStaffForm.password}
-                          onChange={(e) => setNewStaffForm({ ...newStaffForm, password: e.target.value })}
-                          className="bg-background/50 border-white/20"
-                          placeholder="Enter password"
-                          required
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="staffFirstName">First Name</Label>
-                          <Input
-                            id="staffFirstName"
-                            value={newStaffForm.firstName}
-                            onChange={(e) => setNewStaffForm({ ...newStaffForm, firstName: e.target.value })}
-                            className="bg-background/50 border-white/20"
-                            placeholder="Optional"
-                          />
+                    {createdStaffInfo ? (
+                      <div className="space-y-4">
+                        <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+                          <p className="text-green-400 font-semibold mb-2">✓ Staff member created successfully!</p>
+                          <p className="text-sm text-muted-foreground mb-4">
+                            Account created for: <span className="font-medium text-foreground">{createdStaffInfo.name}</span>
+                          </p>
+                          <div className="space-y-2">
+                            <div>
+                              <Label className="text-xs text-muted-foreground">Username (auto-generated)</Label>
+                              <div className="p-2 bg-background/50 border border-white/20 rounded font-mono text-sm">
+                                {createdStaffInfo.username}
+                              </div>
+                            </div>
+                            <div>
+                              <Label className="text-xs text-muted-foreground">Initial Password (auto-generated)</Label>
+                              <div className="p-2 bg-background/50 border border-white/20 rounded font-mono text-sm">
+                                {createdStaffInfo.password}
+                              </div>
+                            </div>
+                            <p className="text-xs text-yellow-400 mt-2">
+                              ⚠️ Please save these credentials. The password cannot be retrieved later.
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <Label htmlFor="staffLastName">Last Name</Label>
-                          <Input
-                            id="staffLastName"
-                            value={newStaffForm.lastName}
-                            onChange={(e) => setNewStaffForm({ ...newStaffForm, lastName: e.target.value })}
-                            className="bg-background/50 border-white/20"
-                            placeholder="Optional"
-                          />
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            onClick={() => {
+                              setCreatedStaffInfo(null);
+                              setStaffDialogOpen(false);
+                            }}
+                            className="flex-1 bg-primary hover:bg-primary/90"
+                          >
+                            Close
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              // Copy credentials to clipboard
+                              const text = `Username: ${createdStaffInfo.username}\nPassword: ${createdStaffInfo.password}`;
+                              navigator.clipboard.writeText(text);
+                              alert('Credentials copied to clipboard!');
+                            }}
+                            className="flex-1"
+                          >
+                            Copy Credentials
+                          </Button>
                         </div>
                       </div>
-                      <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
-                        Add Staff Member
-                      </Button>
-                    </form>
+                    ) : (
+                      <form onSubmit={handleAddStaff} className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="staffFirstName">First Name *</Label>
+                            <Input
+                              id="staffFirstName"
+                              value={newStaffForm.firstName}
+                              onChange={(e) => setNewStaffForm({ ...newStaffForm, firstName: e.target.value })}
+                              className="bg-background/50 border-white/20"
+                              placeholder="Enter first name"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="staffLastName">Last Name *</Label>
+                            <Input
+                              id="staffLastName"
+                              value={newStaffForm.lastName}
+                              onChange={(e) => setNewStaffForm({ ...newStaffForm, lastName: e.target.value })}
+                              className="bg-background/50 border-white/20"
+                              placeholder="Enter last name"
+                              required
+                            />
+                          </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Username will be auto-generated as: lastname + two digits (e.g., smith01). 
+                          Password will be auto-generated. Full name must be unique within FrontDash.
+                        </p>
+                        <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
+                          Add Staff Member
+                        </Button>
+                      </form>
+                    )}
                   </DialogContent>
                 </Dialog>
               </div>

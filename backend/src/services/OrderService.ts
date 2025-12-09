@@ -123,13 +123,31 @@ export class OrderService {
   }
 
   /**
-   * Get order with items
+   * Get order by order number
+   */
+  async getOrderByNumber(orderNumber: string): Promise<Order | undefined> {
+    return await db.getOrderByNumber(orderNumber);
+  }
+
+  /**
+   * Get order with items by order ID
    */
   async getOrderWithItems(orderId: number): Promise<{ order: Order; items: OrderItem[] } | undefined> {
     const order = await db.getOrder(orderId);
     if (!order) return undefined;
     
     const items = await db.getOrderItems(orderId);
+    return { order, items };
+  }
+
+  /**
+   * Get order with items by order number
+   */
+  async getOrderWithItemsByNumber(orderNumber: string): Promise<{ order: Order; items: OrderItem[] } | undefined> {
+    const order = await db.getOrderByNumber(orderNumber);
+    if (!order) return undefined;
+    
+    const items = await db.getOrderItems(order.orderId);
     return { order, items };
   }
 

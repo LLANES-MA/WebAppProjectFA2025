@@ -10,9 +10,17 @@ export class DriverService {
   /**
    * Create a new driver
    */
-  async createDriver(name: string, isActive: boolean = true): Promise<Driver> {
+  async createDriver(firstName: string, lastName: string, isActive: boolean = true): Promise<Driver> {
+    if (!firstName || !firstName.trim()) {
+      throw new Error('First name is required');
+    }
+    if (!lastName || !lastName.trim()) {
+      throw new Error('Last name is required');
+    }
+    
     const driverInput: DriverCreateInput = {
-      name,
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
       isActive,
     };
     return await db.createDriver(driverInput);

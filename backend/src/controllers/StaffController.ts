@@ -13,30 +13,48 @@ export class StaffController {
    */
   async create(req: Request, res: Response): Promise<void> {
     try {
-      const { username, password, firstName, lastName, email } = req.body;
+      const { firstName, lastName } = req.body;
 
-      if (!username || !password) {
+      if (!firstName || !firstName.trim()) {
         res.status(400).json({
           success: false,
-          error: 'username and password are required',
+          error: 'First name is required',
         });
         return;
       }
 
-      const staff = await frontDashMain.staffService.createStaff(
-        username,
-        password,
-        firstName,
-        lastName
+      if (!lastName || !lastName.trim()) {
+        res.status(400).json({
+          success: false,
+          error: 'Last name is required',
+        });
+        return;
+      }
+
+      const result = await frontDashMain.staffService.createStaff(
+        firstName.trim(),
+        lastName.trim()
       );
 
       res.status(201).json({
         success: true,
-        staff,
+        staff: result.staff,
+        username: result.username,
+        password: result.password,
         message: 'Staff member created successfully',
       });
     } catch (error: any) {
       console.error('Create staff error:', error);
+      
+      // Check if it's a duplicate error
+      if (error.message && error.message.includes('already exists')) {
+        res.status(409).json({
+          success: false,
+          error: error.message,
+        });
+        return;
+      }
+      
       res.status(500).json({
         success: false,
         error: error.message || 'Failed to create staff',
