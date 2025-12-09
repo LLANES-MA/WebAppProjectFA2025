@@ -5,7 +5,8 @@ import { Badge } from './ui/badge';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from './ui/sheet';
 import { Input } from './ui/input';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { getApprovedRestaurants, transformRestaurantForDisplay, getRestaurantHours } from '../services/restaurantService';
 
 interface AllRestaurantsProps {
   onBack: () => void;
@@ -20,168 +21,62 @@ interface AllRestaurantsProps {
   onDeliveryAddressChange?: (address: string) => void;
 }
 
-const allRestaurants = [
-  {
-    id: 1,
-    name: "Chick-fil-A",
-    cuisine: "Fast Food",
-    rating: 4.8,
-    deliveryTime: "15-25 min",
-    deliveryFee: "Free",
-    image: "https://images.unsplash.com/photo-1643757412923-619484c906f2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxidXJnZXIlMjBmb29kfGVufDF8fHx8MTc1NjgyMzQ5M3ww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    promo: "Free Delivery",
-    description: "America's favorite chicken restaurant serving delicious sandwiches, nuggets and salads",
-    operatingHours: {
-      monday: { open: '06:00', close: '22:00', closed: false },
-      tuesday: { open: '06:00', close: '22:00', closed: false },
-      wednesday: { open: '06:00', close: '22:00', closed: false },
-      thursday: { open: '06:00', close: '22:00', closed: false },
-      friday: { open: '06:00', close: '22:00', closed: false },
-      saturday: { open: '06:00', close: '22:00', closed: false },
-      sunday: { open: '08:00', close: '20:00', closed: false }
-    }
-  },
-  {
-    id: 2,
-    name: "Mario's Pizzeria",
-    cuisine: "Italian",
-    rating: 4.9,
-    deliveryTime: "25-35 min",
-    deliveryFee: "$2.99",
-    image: "https://images.unsplash.com/photo-1563245738-9169ff58eccf?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwaXp6YSUyMHJlc3RhdXJhbnR8ZW58MXx8fHwxNzU2ODMzNDk5fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    promo: "20% OFF",
-    description: "Authentic Italian pizzas made with fresh ingredients and traditional recipes",
-    operatingHours: {
-      monday: { open: '11:00', close: '22:00', closed: false },
-      tuesday: { open: '11:00', close: '22:00', closed: false },
-      wednesday: { open: '11:00', close: '22:00', closed: false },
-      thursday: { open: '11:00', close: '22:00', closed: false },
-      friday: { open: '11:00', close: '23:00', closed: false },
-      saturday: { open: '11:00', close: '23:00', closed: false },
-      sunday: { open: '12:00', close: '21:00', closed: false }
-    }
-  },
-  {
-    id: 3,
-    name: "Sakura Sushi",
-    cuisine: "Japanese",
-    rating: 4.7,
-    deliveryTime: "30-40 min",
-    deliveryFee: "$3.99",
-    image: "https://images.unsplash.com/photo-1696449241254-11cf7f18ce32?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzdXNoaSUyMHJlc3RhdXJhbnR8ZW58MXx8fHwxNzU2NzUwNzg4fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    description: "Fresh sushi and Japanese cuisine prepared by skilled chefs using premium ingredients",
-    operatingHours: {
-      monday: { open: '17:00', close: '22:00', closed: false },
-      tuesday: { open: '17:00', close: '22:00', closed: false },
-      wednesday: { open: '17:00', close: '22:00', closed: false },
-      thursday: { open: '17:00', close: '22:00', closed: false },
-      friday: { open: '17:00', close: '23:00', closed: false },
-      saturday: { open: '17:00', close: '23:00', closed: false },
-      sunday: { open: '17:00', close: '21:00', closed: false }
-    }
-  },
-  {
-    id: 4,
-    name: "Nonna's Kitchen",
-    cuisine: "Italian",
-    rating: 4.6,
-    deliveryTime: "20-30 min",
-    deliveryFee: "$2.49",
-    image: "https://images.unsplash.com/photo-1662197480393-2a82030b7b83?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxpdGFsaWFuJTIwcGFzdGF8ZW58MXx8fHwxNzU2ODIzNDk0fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    description: "Traditional Italian comfort food and homemade pasta dishes",
-    operatingHours: {
-      monday: { open: '10:00', close: '21:00', closed: false },
-      tuesday: { open: '10:00', close: '21:00', closed: false },
-      wednesday: { open: '10:00', close: '21:00', closed: false },
-      thursday: { open: '10:00', close: '21:00', closed: false },
-      friday: { open: '10:00', close: '22:00', closed: false },
-      saturday: { open: '10:00', close: '22:00', closed: false },
-      sunday: { open: '10:00', close: '20:00', closed: false }
-    }
-  },
-  {
-    id: 5,
-    name: "Burger Palace",
-    cuisine: "American",
-    rating: 4.5,
-    deliveryTime: "25-35 min",
-    deliveryFee: "$1.99",
-    image: "https://images.unsplash.com/photo-1643757412923-619484c906f2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxidXJnZXIlMjBmb29kfGVufDF8fHx8MTc1NjgyMzQ5M3ww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    description: "Gourmet burgers made with premium beef and fresh toppings",
-    operatingHours: {
-      monday: { open: '11:00', close: '23:00', closed: false },
-      tuesday: { open: '11:00', close: '23:00', closed: false },
-      wednesday: { open: '11:00', close: '23:00', closed: false },
-      thursday: { open: '11:00', close: '23:00', closed: false },
-      friday: { open: '11:00', close: '24:00', closed: false },
-      saturday: { open: '11:00', close: '24:00', closed: false },
-      sunday: { open: '11:00', close: '22:00', closed: false }
-    }
-  },
-  {
-    id: 6,
-    name: "Taco Express",
-    cuisine: "Mexican",
-    rating: 4.4,
-    deliveryTime: "20-30 min",
-    deliveryFee: "$2.99",
-    image: "https://images.unsplash.com/photo-1696449241254-11cf7f18ce32?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzdXNoaSUyMHJlc3RhdXJhbnR8ZW58MXx8fHwxNzU2NzUwNzg4fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    description: "Authentic Mexican street food and fresh tacos made to order",
-    operatingHours: {
-      monday: { open: '09:00', close: '22:00', closed: false },
-      tuesday: { open: '09:00', close: '22:00', closed: false },
-      wednesday: { open: '09:00', close: '22:00', closed: false },
-      thursday: { open: '09:00', close: '22:00', closed: false },
-      friday: { open: '09:00', close: '23:00', closed: false },
-      saturday: { open: '09:00', close: '23:00', closed: false },
-      sunday: { open: '10:00', close: '21:00', closed: false }
-    }
-  },
-  {
-    id: 7,
-    name: "Dragon Garden",
-    cuisine: "Chinese",
-    rating: 4.3,
-    deliveryTime: "25-35 min",
-    deliveryFee: "$3.49",
-    image: "https://images.unsplash.com/photo-1696449241254-11cf7f18ce32?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzdXNoaSUyMHJlc3RhdXJhbnR8ZW58MXx8fHwxNzU2NzUwNzg4fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    description: "Traditional Chinese cuisine with bold flavors and generous portions",
-    operatingHours: {
-      monday: { open: '11:00', close: '22:00', closed: false },
-      tuesday: { open: '11:00', close: '22:00', closed: false },
-      wednesday: { open: '11:00', close: '22:00', closed: false },
-      thursday: { open: '11:00', close: '22:00', closed: false },
-      friday: { open: '11:00', close: '23:00', closed: false },
-      saturday: { open: '11:00', close: '23:00', closed: false },
-      sunday: { open: '12:00', close: '21:00', closed: false }
-    }
-  },
-  {
-    id: 8,
-    name: "The Steakhouse",
-    cuisine: "American",
-    rating: 4.8,
-    deliveryTime: "35-45 min",
-    deliveryFee: "$4.99",
-    image: "https://images.unsplash.com/photo-1643757412923-619484c906f2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxidXJnZXIlMjBmb29kfGVufDF8fHx8MTc1NjgyMzQ5M3ww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    description: "Premium steaks and fine dining experience with exceptional service",
-    operatingHours: {
-      monday: { open: '17:00', close: '22:00', closed: false },
-      tuesday: { open: '17:00', close: '22:00', closed: false },
-      wednesday: { open: '17:00', close: '22:00', closed: false },
-      thursday: { open: '17:00', close: '22:00', closed: false },
-      friday: { open: '17:00', close: '23:00', closed: false },
-      saturday: { open: '17:00', close: '23:00', closed: false },
-      sunday: { open: '17:00', close: '21:00', closed: false }
-    }
-  }
-];
+// All restaurant data is now fetched dynamically from the API
 
 export default function AllRestaurants({ onBack, onRestaurantSelect, onRestaurantSignup, onViewCart, onGoToAccount, onGoToSettings, onGoToSignIn, searchQuery = '', deliveryAddress = '', onDeliveryAddressChange }: AllRestaurantsProps) {
   const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery);
+  const [restaurants, setRestaurants] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch restaurants and their operating hours from API
+  useEffect(() => {
+    async function fetchRestaurants() {
+      try {
+        setLoading(true);
+        const approvedRestaurants = await getApprovedRestaurants();
+        
+        // Fetch operating hours for each restaurant
+        const restaurantsWithHours = await Promise.all(
+          approvedRestaurants.map(async (restaurant) => {
+            const hours = await getRestaurantHours(restaurant.id);
+            // Transform hours array into object format
+            const operatingHours: any = {};
+            hours.forEach(hour => {
+              operatingHours[hour.dayOfWeek] = {
+                open: hour.openTime,
+                close: hour.closeTime,
+                closed: hour.isClosed,
+              };
+            });
+            
+            return {
+              ...transformRestaurantForDisplay(restaurant),
+              operatingHours,
+            };
+          })
+        );
+        
+        setRestaurants(restaurantsWithHours);
+        setError(null);
+      } catch (err: any) {
+        console.error('Error fetching restaurants:', err);
+        setError('Failed to load restaurants');
+        setRestaurants([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchRestaurants();
+  }, []);
 
   // Function to check if restaurant is currently closed
   const isRestaurantClosed = (restaurant: any) => {
+    if (!restaurant.operatingHours || Object.keys(restaurant.operatingHours).length === 0) {
+      return false; // Assume open if no hours data
+    }
+    
     const now = new Date();
     const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     const currentDay = dayNames[now.getDay()];
@@ -191,13 +86,13 @@ export default function AllRestaurants({ onBack, onRestaurantSelect, onRestauran
     const todayHours = restaurant.operatingHours[dayKey];
     
     // If restaurant is closed on this day
-    if (todayHours.closed) {
+    if (todayHours?.closed) {
       return true;
     }
     
     // If no operating hours set for this day
-    if (!todayHours.open || !todayHours.close) {
-      return true;
+    if (!todayHours?.open || !todayHours?.close) {
+      return false; // Assume open if no hours specified
     }
     
     // Check if current time is within operating hours
@@ -207,19 +102,19 @@ export default function AllRestaurants({ onBack, onRestaurantSelect, onRestauran
   // Filter and sort restaurants based on search query and operating status
   const filteredRestaurants = useMemo(() => {
     const query = localSearchQuery.toLowerCase();
-    let restaurants = allRestaurants;
+    let filtered = restaurants;
     
     // Filter by search query
     if (query) {
-      restaurants = restaurants.filter(restaurant => 
+      filtered = filtered.filter(restaurant => 
         restaurant.name.toLowerCase().includes(query) ||
         restaurant.cuisine.toLowerCase().includes(query) ||
-        restaurant.description.toLowerCase().includes(query)
+        (restaurant.description && restaurant.description.toLowerCase().includes(query))
       );
     }
     
     // Sort restaurants: open restaurants first, then closed restaurants
-    return restaurants.sort((a, b) => {
+    return filtered.sort((a, b) => {
       const aClosed = isRestaurantClosed(a);
       const bClosed = isRestaurantClosed(b);
       
@@ -231,7 +126,7 @@ export default function AllRestaurants({ onBack, onRestaurantSelect, onRestauran
       // Open restaurants come first
       return aClosed ? 1 : -1;
     });
-  }, [localSearchQuery]);
+  }, [localSearchQuery, restaurants]);
 
   const displayQuery = localSearchQuery || searchQuery;
   return (
@@ -251,7 +146,9 @@ export default function AllRestaurants({ onBack, onRestaurantSelect, onRestauran
               </Button>
               <div>
                 <h1 className="text-2xl font-semibold text-foreground">All Restaurants</h1>
-                <p className="text-sm text-muted-foreground">{allRestaurants.length} restaurants available</p>
+                <p className="text-sm text-muted-foreground">
+                  {loading ? 'Loading...' : `${filteredRestaurants.length} restaurants available`}
+                </p>
               </div>
             </div>
             <div className="flex items-center space-x-4">
@@ -431,6 +328,20 @@ export default function AllRestaurants({ onBack, onRestaurantSelect, onRestauran
             >
               Browse All Restaurants
             </Button>
+          </div>
+        ) : loading ? (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Loading restaurants...</p>
+          </div>
+        ) : error ? (
+          <div className="text-center py-12">
+            <p className="text-destructive">{error}</p>
+          </div>
+        ) : filteredRestaurants.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">
+              {localSearchQuery ? 'No restaurants found matching your search.' : 'No restaurants available at the moment.'}
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">

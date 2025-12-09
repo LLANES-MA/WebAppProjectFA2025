@@ -23,7 +23,7 @@ export class EmailService {
 
     // Only initialize if email configuration is provided
     if (emailHost && emailPort && emailUser && emailPass) {
-      this.transporter = nodemailer.createTransporter({
+      this.transporter = nodemailer.createTransport({
         host: emailHost,
         port: parseInt(emailPort),
         secure: false, // true for 465, false for other ports

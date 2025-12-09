@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
@@ -104,14 +104,143 @@ export default function StaffDashboard({ onBack }: StaffDashboardProps) {
     confirmPassword: "" 
   });
   const [searchOrderId, setSearchOrderId] = useState("");
-  const [orders, setOrders] = useState(mockOrders);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [drivers, setDrivers] = useState<any[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [restaurantNames, setRestaurantNames] = useState<{ [key: number]: string }>({});
+  const [orderDrivers, setOrderDrivers] = useState<{ [key: number]: { name: string; id: number } }>({});
+  
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+  
+  // Fetch orders and drivers when logged in
+  useEffect(() => {
+    if (isLoggedIn) {
+      fetchOrders();
+      fetchDrivers();
+    }
+  }, [isLoggedIn]);
+  
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE_URL}/orders`);
+      if (response.ok) {
+        const data = await response.json();
+        const ordersList = data.orders || [];
+        setOrders(ordersList);
+        
+        // Fetch restaurant names and driver info for all orders
+        const restaurantIds = [...new Set(ordersList.map((o: any) => o.restaurantId))];
+        const restaurantNamesMap: { [key: number]: string } = {};
+        for (const id of restaurantIds) {
+          try {
+            const resResponse = await fetch(`${API_BASE_URL}/restaurants/${id}`);
+            if (resResponse.ok) {
+              const resData = await resResponse.json();
+              restaurantNamesMap[id] = resData.restaurant?.restaurantName || 'Unknown Restaurant';
+            }
+          } catch (err) {
+            restaurantNamesMap[id] = 'Unknown Restaurant';
+          }
+        }
+        setRestaurantNames(restaurantNamesMap);
+        
+        // Fetch driver assignments for all orders
+        const driverMap: { [key: number]: { name: string; id: number } } = {};
+        for (const order of ordersList) {
+          try {
+            const deliveryResponse = await fetch(`${API_BASE_URL}/deliveries/order/${order.orderId}`);
+            if (deliveryResponse.ok) {
+              const deliveryData = await deliveryResponse.json();
+              if (deliveryData.assignments && deliveryData.assignments.length > 0) {
+                const assignment = deliveryData.assignments[0];
+                if (assignment.driverId) {
+                  const driverResponse = await fetch(`${API_BASE_URL}/drivers/${assignment.driverId}`);
+                  if (driverResponse.ok) {
+                    const driverData = await driverResponse.json();
+                    driverMap[order.orderId] = {
+                      name: driverData.driver?.name || 'Unknown Driver',
+                      id: assignment.driverId,
+                    };
+                  }
+                }
+              }
+            }
+          } catch (err) {
+            // No driver assigned
+          }
+        }
+        setOrderDrivers(driverMap);
+      } else {
+        throw new Error('Failed to fetch orders');
+      }
+    } catch (err: any) {
+      console.error('Error fetching orders:', err);
+      setError(err.message || 'Failed to load orders');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const fetchDrivers = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/drivers/active`);
+      if (response.ok) {
+        const data = await response.json();
+        setDrivers(data.drivers || []);
+      }
+    } catch (err: any) {
+      console.error('Error fetching drivers:', err);
+    }
+  };
+  
+  const fetchOrderDetails = async (orderId: number) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/orders/${orderId}`);
+      if (response.ok) {
+        const data = await response.json();
+        return { order: data.order, items: data.items || [] };
+      }
+      return null;
+    } catch (err: any) {
+      console.error('Error fetching order details:', err);
+      return null;
+    }
+  };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simple mock login - in real app, validate against backend
-    if (loginForm.email && loginForm.password) {
-      setIsLoggedIn(true);
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE_URL}/auth/staff/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: loginForm.email,
+          password: loginForm.password,
+        }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setIsLoggedIn(true);
+        localStorage.setItem('staffUsername', loginForm.email);
+        // Fetch orders and drivers
+        await fetchOrders();
+        await fetchDrivers();
+      } else {
+        const errorData = await response.json();
+        alert(errorData.error || 'Login failed');
+      }
+    } catch (err: any) {
+      console.error('Login error:', err);
+      alert('Login failed: ' + err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -131,56 +260,162 @@ export default function StaffDashboard({ onBack }: StaffDashboardProps) {
     }
   };
 
-  const handleSearchOrder = () => {
-    const order = orders.find(o => o.id === searchOrderId);
-    if (order) {
-      setSelectedOrder(order);
-    } else {
-      alert("Order not found!");
+  const handleSearchOrder = async () => {
+    try {
+      // Try to parse as order ID
+      const orderId = parseInt(searchOrderId);
+      if (isNaN(orderId)) {
+        alert("Please enter a valid order ID");
+        return;
+      }
+      
+      const orderData = await fetchOrderDetails(orderId);
+      if (orderData) {
+        // Fetch delivery assignment if exists
+        const deliveryResponse = await fetch(`${API_BASE_URL}/deliveries/order/${orderId}`);
+        let delivery = null;
+        if (deliveryResponse.ok) {
+          const deliveryData = await deliveryResponse.json();
+          if (deliveryData.assignments && deliveryData.assignments.length > 0) {
+            delivery = deliveryData.assignments[0];
+            // Fetch driver info
+            if (delivery.driverId) {
+              const driverResponse = await fetch(`${API_BASE_URL}/drivers/${delivery.driverId}`);
+              if (driverResponse.ok) {
+                const driverData = await driverResponse.json();
+                delivery.driver = driverData.driver;
+              }
+            }
+          }
+        }
+        
+        // Fetch restaurant info
+        let restaurant = null;
+        if (orderData.order.restaurantId) {
+          const restaurantResponse = await fetch(`${API_BASE_URL}/restaurants/${orderData.order.restaurantId}`);
+          if (restaurantResponse.ok) {
+            const restaurantData = await restaurantResponse.json();
+            restaurant = restaurantData.restaurant;
+          }
+        }
+        
+        setSelectedOrder({
+          ...orderData.order,
+          items: orderData.items,
+          restaurant: restaurant?.restaurantName || 'Unknown Restaurant',
+          delivery: delivery,
+        });
+      } else {
+        alert("Order not found!");
+      }
+    } catch (err: any) {
+      console.error('Search error:', err);
+      alert('Failed to search order: ' + err.message);
     }
   };
 
-  const handleUpdateDeliveryEstimate = (orderId: string, newEstimate: string) => {
+  const handleUpdateDeliveryEstimate = async (orderId: number, newEstimate: string) => {
+    // Note: Delivery estimate might be stored in delivery assignment or calculated
+    // For now, we'll just update the local state
     setOrders(prevOrders => 
       prevOrders.map(order => 
-        order.id === orderId 
+        order.orderId === orderId 
           ? { ...order, estimatedDelivery: newEstimate }
           : order
       )
     );
     console.log(`Updated delivery estimate for ${orderId} to ${newEstimate}`);
+    // TODO: If there's a backend endpoint for updating delivery estimates, call it here
   };
 
-  const handleAssignDriver = (orderId: string, driverId: number, driverName: string) => {
-    setOrders(prevOrders => 
-      prevOrders.map(order => 
-        order.id === orderId 
-          ? { ...order, driverId, driver: driverName, status: "delivering" }
-          : order
-      )
-    );
-    console.log(`Assigned driver ${driverName} to order ${orderId}`);
+  const handleAssignDriver = async (orderId: number, driverId: number, driverName: string) => {
+    try {
+      const staffUsername = localStorage.getItem('staffUsername') || 'staff';
+      const response = await fetch(`${API_BASE_URL}/deliveries`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          orderId: orderId,
+          driverId: driverId,
+          assignedByStaff: staffUsername,
+          deliveryStatus: 'assigned',
+        }),
+      });
+      
+      if (response.ok) {
+        // Update order status to out_for_delivery
+        await fetch(`${API_BASE_URL}/orders/${orderId}/status`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ status: 'out_for_delivery' }),
+        });
+        
+        // Refresh orders
+        await fetchOrders();
+        alert(`Driver ${driverName} assigned to order ${orderId}`);
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to assign driver');
+      }
+    } catch (err: any) {
+      console.error('Assign driver error:', err);
+      alert('Failed to assign driver: ' + err.message);
+    }
   };
 
-  const handleUpdateOrderStatus = (orderId: string, newStatus: string) => {
-    setOrders(prevOrders => 
-      prevOrders.map(order => 
-        order.id === orderId 
-          ? { ...order, status: newStatus }
-          : order
-      )
-    );
-    console.log(`Updated order ${orderId} status to ${newStatus}`);
+  const handleUpdateOrderStatus = async (orderId: number, newStatus: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/orders/${orderId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      
+      if (response.ok) {
+        // Refresh orders
+        await fetchOrders();
+        alert(`Order ${orderId} status updated to ${newStatus}`);
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update order status');
+      }
+    } catch (err: any) {
+      console.error('Update order status error:', err);
+      alert('Failed to update order status: ' + err.message);
+    }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'pending': return 'bg-gray-600';
+      case 'confirmed': return 'bg-blue-600';
       case 'preparing': return 'bg-yellow-600';
       case 'ready': return 'bg-blue-600';
+      case 'out_for_delivery': return 'bg-purple-600';
       case 'delivering': return 'bg-purple-600';
       case 'delivered': return 'bg-green-600';
+      case 'cancelled': return 'bg-red-600';
       default: return 'bg-gray-600';
     }
+  };
+  
+  const getRestaurantName = async (restaurantId: number): Promise<string> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/restaurants/${restaurantId}`);
+      if (response.ok) {
+        const data = await response.json();
+        return data.restaurant?.restaurantName || 'Unknown Restaurant';
+      }
+    } catch (err) {
+      console.error('Error fetching restaurant:', err);
+    }
+    return 'Unknown Restaurant';
   };
 
   // Login Screen
@@ -323,126 +558,129 @@ export default function StaffDashboard({ onBack }: StaffDashboardProps) {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {orders.map((order) => (
-                          <TableRow key={order.id} className="border-white/10">
-                            <TableCell className="font-medium">{order.id}</TableCell>
-                            <TableCell>{order.restaurant}</TableCell>
-                            <TableCell>{order.customer}</TableCell>
-                            <TableCell>
-                              <Badge className={`${getStatusColor(order.status)} text-white`}>
-                                {order.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>{order.estimatedDelivery}</TableCell>
-                            <TableCell>{order.driver || "Unassigned"}</TableCell>
-                            <TableCell>
-                              <div className="flex gap-1">
-                                <Dialog>
-                                  <DialogTrigger asChild>
-                                    <Button size="sm" variant="outline" className="border-primary/50 text-primary hover:bg-primary/10">
-                                      <Clock className="h-3 w-3" />
-                                    </Button>
-                                  </DialogTrigger>
-                                  <DialogContent className="bg-card/95 backdrop-blur-sm border-white/20">
-                                    <DialogHeader>
-                                      <DialogTitle>Update Delivery Time - {order.id}</DialogTitle>
-                                      <DialogDescription>
-                                        Modify the estimated delivery time for this order to provide accurate updates to the customer.
-                                      </DialogDescription>
-                                    </DialogHeader>
-                                    <div className="space-y-4">
-                                      <div>
-                                        <Label>New Estimated Delivery Time</Label>
-                                        <Input
-                                          type="time"
-                                          defaultValue={order.estimatedDelivery}
-                                          className="bg-background/50 border-white/20"
-                                          onChange={(e) => handleUpdateDeliveryEstimate(order.id, e.target.value)}
-                                        />
-                                      </div>
-                                      <Button 
-                                        onClick={() => handleUpdateDeliveryEstimate(order.id, "15:45")} 
-                                        className="w-full bg-primary hover:bg-primary/90"
-                                      >
-                                        Update Time
-                                      </Button>
-                                    </div>
-                                  </DialogContent>
-                                </Dialog>
-
-                                {!order.driverId && (
-                                  <Dialog>
-                                    <DialogTrigger asChild>
-                                      <Button size="sm" variant="outline" className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10">
-                                        <Car className="h-3 w-3" />
-                                      </Button>
-                                    </DialogTrigger>
-                                    <DialogContent className="bg-card/95 backdrop-blur-sm border-white/20">
-                                      <DialogHeader>
-                                        <DialogTitle>Assign Driver - {order.id}</DialogTitle>
-                                        <DialogDescription>
-                                          Select an available driver to handle the delivery of this order.
-                                        </DialogDescription>
-                                      </DialogHeader>
-                                      <div className="space-y-4">
-                                        {availableDrivers.filter(d => d.status === 'available').map((driver) => (
-                                          <div key={driver.id} className="flex items-center justify-between p-3 border border-white/10 rounded-lg">
-                                            <div>
-                                              <p className="font-medium">{driver.name}</p>
-                                              <p className="text-sm text-muted-foreground">{driver.vehicle}</p>
-                                            </div>
-                                            <Button
-                                              size="sm"
-                                              onClick={() => handleAssignDriver(order.id, driver.id, driver.name)}
-                                              className="bg-primary hover:bg-primary/90"
-                                            >
-                                              Assign
-                                            </Button>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </DialogContent>
-                                  </Dialog>
-                                )}
-
-                                <Dialog>
-                                  <DialogTrigger asChild>
-                                    <Button size="sm" variant="outline" className="border-green-500/50 text-green-400 hover:bg-green-500/10">
-                                      <CheckCircle className="h-3 w-3" />
-                                    </Button>
-                                  </DialogTrigger>
-                                  <DialogContent className="bg-card/95 backdrop-blur-sm border-white/20">
-                                    <DialogHeader>
-                                      <DialogTitle>Update Order Status - {order.id}</DialogTitle>
-                                      <DialogDescription>
-                                        Change the current status of this order to keep customers informed about their delivery progress.
-                                      </DialogDescription>
-                                    </DialogHeader>
-                                    <div className="space-y-4">
-                                      <div>
-                                        <Label>New Status</Label>
-                                        <Select onValueChange={(value) => handleUpdateOrderStatus(order.id, value)}>
-                                          <SelectTrigger className="bg-background/50 border-white/20">
-                                            <SelectValue placeholder="Select status" />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            <SelectItem value="preparing">Preparing</SelectItem>
-                                            <SelectItem value="ready">Ready</SelectItem>
-                                            <SelectItem value="delivering">Delivering</SelectItem>
-                                            <SelectItem value="delivered">Delivered</SelectItem>
-                                          </SelectContent>
-                                        </Select>
-                                      </div>
-                                      <Button className="w-full bg-primary hover:bg-primary/90">
-                                        Update Status
-                                      </Button>
-                                    </div>
-                                  </DialogContent>
-                                </Dialog>
-                              </div>
+                        {loading ? (
+                          <TableRow>
+                            <TableCell colSpan={7} className="text-center py-8">
+                              <p className="text-muted-foreground">Loading orders...</p>
                             </TableCell>
                           </TableRow>
-                        ))}
+                        ) : orders.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={7} className="text-center py-8">
+                              <p className="text-muted-foreground">No orders found</p>
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          orders.map((order: any) => {
+                            const restaurantName = restaurantNames[order.restaurantId] || 'Loading...';
+                            const orderDate = new Date(order.orderTime);
+                            const formattedTime = orderDate.toLocaleString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            });
+                            const orderStatus = order.orderStatus || order.status;
+                            const customerCode = order.uniqueCustomerCode ? `Customer #${order.uniqueCustomerCode}` : 'Guest';
+                            const driverInfo = orderDrivers[order.orderId];
+                            const driverName = driverInfo ? driverInfo.name : "Unassigned";
+                            
+                            return (
+                              <TableRow key={order.orderId} className="border-white/10">
+                                <TableCell className="font-medium">#{order.orderId}</TableCell>
+                                <TableCell>{restaurantName}</TableCell>
+                                <TableCell>{customerCode}</TableCell>
+                                <TableCell>
+                                  <Badge className={`${getStatusColor(orderStatus)} text-white`}>
+                                    {orderStatus}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>{formattedTime}</TableCell>
+                                <TableCell>{driverName}</TableCell>
+                                <TableCell>
+                                  <div className="flex gap-1">
+                                    {!driverInfo && (
+                                      <Dialog>
+                                        <DialogTrigger asChild>
+                                          <Button size="sm" variant="outline" className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10">
+                                            <Car className="h-3 w-3" />
+                                          </Button>
+                                        </DialogTrigger>
+                                        <DialogContent className="bg-card/95 backdrop-blur-sm border-white/20">
+                                          <DialogHeader>
+                                            <DialogTitle>Assign Driver - Order #{order.orderId}</DialogTitle>
+                                            <DialogDescription>
+                                              Select an available driver to handle the delivery of this order.
+                                            </DialogDescription>
+                                          </DialogHeader>
+                                          <div className="space-y-4">
+                                            {drivers.length === 0 ? (
+                                              <p className="text-muted-foreground">No available drivers</p>
+                                            ) : (
+                                              drivers.map((driver: any) => (
+                                                <div key={driver.driverId} className="flex items-center justify-between p-3 border border-white/10 rounded-lg">
+                                                  <div>
+                                                    <p className="font-medium">{driver.name}</p>
+                                                    <p className="text-sm text-muted-foreground">{driver.vehicle || 'N/A'}</p>
+                                                  </div>
+                                                  <Button
+                                                    size="sm"
+                                                    onClick={() => handleAssignDriver(order.orderId, driver.driverId, driver.name)}
+                                                    className="bg-primary hover:bg-primary/90"
+                                                  >
+                                                    Assign
+                                                  </Button>
+                                                </div>
+                                              ))
+                                            )}
+                                          </div>
+                                        </DialogContent>
+                                      </Dialog>
+                                    )}
+
+                                    <Dialog>
+                                      <DialogTrigger asChild>
+                                        <Button size="sm" variant="outline" className="border-green-500/50 text-green-400 hover:bg-green-500/10">
+                                          <CheckCircle className="h-3 w-3" />
+                                        </Button>
+                                      </DialogTrigger>
+                                      <DialogContent className="bg-card/95 backdrop-blur-sm border-white/20">
+                                        <DialogHeader>
+                                          <DialogTitle>Update Order Status - Order #{order.orderId}</DialogTitle>
+                                          <DialogDescription>
+                                            Change the current status of this order to keep customers informed about their delivery progress.
+                                          </DialogDescription>
+                                        </DialogHeader>
+                                        <div className="space-y-4">
+                                          <div>
+                                            <Label>New Status</Label>
+                                            <Select onValueChange={(value) => handleUpdateOrderStatus(order.orderId, value)}>
+                                              <SelectTrigger className="bg-background/50 border-white/20">
+                                                <SelectValue placeholder="Select status" />
+                                              </SelectTrigger>
+                                              <SelectContent>
+                                                <SelectItem value="pending">Pending</SelectItem>
+                                                <SelectItem value="confirmed">Confirmed</SelectItem>
+                                                <SelectItem value="preparing">Preparing</SelectItem>
+                                                <SelectItem value="ready">Ready</SelectItem>
+                                                <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
+                                                <SelectItem value="delivered">Delivered</SelectItem>
+                                                <SelectItem value="cancelled">Cancelled</SelectItem>
+                                              </SelectContent>
+                                            </Select>
+                                          </div>
+                                          <Button className="w-full bg-primary hover:bg-primary/90">
+                                            Update Status
+                                          </Button>
+                                        </div>
+                                      </DialogContent>
+                                    </Dialog>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
                       </TableBody>
                     </Table>
                   </div>

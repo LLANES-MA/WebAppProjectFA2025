@@ -127,10 +127,18 @@ export async function registerRestaurant(
   registrationData: RestaurantRegistrationRequest
 ): Promise<{ success: boolean; restaurantId?: number; error?: string }> {
   const useBackend = import.meta.env.VITE_USE_BACKEND === 'true';
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+  
+  console.log('📡 Registration request:', {
+    useBackend,
+    apiBaseUrl,
+    restaurantName: registrationData.restaurantName,
+  });
   
   if (useBackend) {
     try {
-      const response = await fetch(`${API_BASE_URL}/restaurants/register`, {
+      console.log('📡 Calling backend:', `${apiBaseUrl}/restaurants/register`);
+      const response = await fetch(`${apiBaseUrl}/restaurants/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -141,9 +149,17 @@ export async function registerRestaurant(
         })
       });
 
+      console.log('📡 Response status:', response.status, response.statusText);
+
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || `Registration failed with status ${response.status}`);
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { message: errorText || `Registration failed with status ${response.status}` };
+        }
+        throw new Error(errorData.message || errorData.error || `Registration failed with status ${response.status}`);
       }
 
       const result = await response.json();
@@ -158,9 +174,21 @@ export async function registerRestaurant(
       };
     } catch (error: any) {
       console.error('❌ Failed to register restaurant:', error);
+      console.error('Error details:', {
+        message: error.message,
+        name: error.name,
+        stack: error.stack,
+      });
+      
+      // Provide more helpful error messages
+      let errorMessage = error.message || 'Failed to register restaurant';
+      if (error.message === 'Failed to fetch' || error.name === 'TypeError') {
+        errorMessage = 'Cannot connect to backend server. Please ensure the backend is running on http://localhost:8080';
+      }
+      
       return {
         success: false,
-        error: error.message || 'Failed to register restaurant'
+        error: errorMessage
       };
     }
   } else {

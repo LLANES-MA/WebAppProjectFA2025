@@ -160,7 +160,7 @@ export default function App() {
         onGoToSettings: () => setCurrentScreen('settings'),
         onGoToSignIn: () => setCurrentScreen('signin'),
         onViewCart: () => setCurrentScreen('cart'),
-        onGoToRestaurantDashboard: () => setCurrentScreen('restaurant-dashboard'),
+        onGoToRestaurantDashboard: () => setCurrentScreen('restaurant-signin'),
         deliveryAddress,
         onDeliveryAddressChange: setDeliveryAddress
       })}
@@ -215,6 +215,7 @@ export default function App() {
       {currentScreen === 'checkout' && renderComponent(Checkout, {
         cartItems: cartItems,
         total: orderTotal,
+        selectedRestaurant: selectedRestaurant,
         onBack: () => setCurrentScreen('cart'),
         onOrderComplete: () => setCurrentScreen('order-confirmation'),
         onRestaurantSignup: () => setCurrentScreen('restaurant-registration'),
@@ -292,7 +293,7 @@ export default function App() {
         onSignInSuccess: (userType: string) => setCurrentScreen('homepage'),
         onGoToAdminSignIn: () => setCurrentScreen('admin'),
         onGoToStaffSignIn: () => setCurrentScreen('staff'),
-        onGoToRestaurantSignIn: () => setCurrentScreen('restaurant-dashboard')
+        onGoToRestaurantSignIn: () => setCurrentScreen('restaurant-signin')
       })}
 
       {currentScreen === 'admin-signin' && renderComponent(AdminSignIn, {

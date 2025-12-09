@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
@@ -33,82 +33,238 @@ import { Separator } from './ui/separator';
 
 interface RestaurantDashboardProps {
   onBack: () => void;
+  restaurantId?: number; // Optional restaurant ID prop
 }
 
-const recentOrders = [
-  {
-    id: '1234',
-    customer: 'John D.',
-    items: 'Margherita Pizza, Caesar Salad',
-    total: 28.50,
-    status: 'preparing',
-    time: '10 min ago',
-    estimatedReady: '15 min'
-  },
-  {
-    id: '1235',
-    customer: 'Sarah M.',
-    items: 'Chicken Alfredo, Garlic Bread',
-    total: 24.99,
-    status: 'ready',
-    time: '5 min ago',
-    estimatedReady: 'Ready now'
-  },
-  {
-    id: '1236',
-    customer: 'Mike R.',
-    items: 'BBQ Pizza, Wings',
-    total: 35.75,
-    status: 'delivered',
-    time: '25 min ago',
-    estimatedReady: 'Delivered'
-  }
-];
-
-const menuItems = [
-  {
-    id: 1,
-    name: 'Margherita Pizza',
-    description: 'Fresh mozzarella, tomato sauce, basil',
-    price: 18.99,
-    category: 'Pizza',
-    available: true,
-    popular: true
-  },
-  {
-    id: 2,
-    name: 'Chicken Alfredo',
-    description: 'Grilled chicken with creamy alfredo sauce',
-    price: 22.99,
-    category: 'Pasta',
-    available: true,
-    popular: false
-  },
-  {
-    id: 3,
-    name: 'Caesar Salad',
-    description: 'Fresh romaine, parmesan, croutons, caesar dressing',
-    price: 12.99,
-    category: 'Salads',
-    available: false,
-    popular: false
-  }
-];
-
-export default function RestaurantDashboard({ onBack }: RestaurantDashboardProps) {
+export default function RestaurantDashboard({ onBack, restaurantId }: RestaurantDashboardProps) {
   const [activeTab, setActiveTab] = useState('overview');
   const [isLeaveDialogOpen, setIsLeaveDialogOpen] = useState(false);
+  const [restaurant, setRestaurant] = useState<any>(null);
+  const [recentOrders, setRecentOrders] = useState<any[]>([]);
+  const [allOrders, setAllOrders] = useState<any[]>([]); // All orders for stats calculation
+  const [menuItems, setMenuItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   
-  // Operating hours state
-  const [operatingHours, setOperatingHours] = useState({
-    monday: { open: '09:00', close: '22:00', closed: false },
-    tuesday: { open: '09:00', close: '22:00', closed: false },
-    wednesday: { open: '09:00', close: '22:00', closed: false },
-    thursday: { open: '09:00', close: '22:00', closed: false },
-    friday: { open: '09:00', close: '23:00', closed: false },
-    saturday: { open: '10:00', close: '23:00', closed: false },
-    sunday: { open: '10:00', close: '21:00', closed: false }
+  // Form state for settings
+  const [formData, setFormData] = useState({
+    restaurantName: '',
+    phone: '',
+    description: '',
+    deliveryFee: '',
+    minimumOrder: '',
+    preparationTime: '',
   });
+  
+  // Get restaurant ID from localStorage (set during login) or prop
+  const [currentRestaurantId, setCurrentRestaurantId] = useState<number | null>(
+    restaurantId || parseInt(localStorage.getItem('restaurantId') || '0') || null
+  );
+
+  // Operating hours state - will be populated from database
+  const [operatingHours, setOperatingHours] = useState({
+    monday: { open: '', close: '', closed: true },
+    tuesday: { open: '', close: '', closed: true },
+    wednesday: { open: '', close: '', closed: true },
+    thursday: { open: '', close: '', closed: true },
+    friday: { open: '', close: '', closed: true },
+    saturday: { open: '', close: '', closed: true },
+    sunday: { open: '', close: '', closed: true }
+  });
+
+  useEffect(() => {
+    // Check localStorage again in case it was set after component mount
+    if (!currentRestaurantId) {
+      const storedId = localStorage.getItem('restaurantId');
+      if (storedId) {
+        const id = parseInt(storedId);
+        if (id > 0) {
+          setCurrentRestaurantId(id);
+          return; // Will trigger useEffect again with the ID
+        }
+      }
+    }
+
+    async function fetchRestaurantData() {
+      if (!currentRestaurantId || currentRestaurantId === 0) {
+        setError('Restaurant ID not found. Please sign in again.');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+        
+        // Fetch restaurant data
+        const restaurantResponse = await fetch(`${API_BASE_URL}/restaurants/${currentRestaurantId}`);
+        if (!restaurantResponse.ok) throw new Error('Failed to fetch restaurant');
+        const restaurantData = await restaurantResponse.json();
+        const restaurantInfo = restaurantData.restaurant;
+        setRestaurant(restaurantInfo);
+        
+        // Initialize form data
+        setFormData({
+          restaurantName: restaurantInfo?.restaurantName || '',
+          phone: restaurantInfo?.phone || '',
+          description: restaurantInfo?.description || '',
+          deliveryFee: restaurantInfo?.deliveryFee?.toString() || '0',
+          minimumOrder: restaurantInfo?.minimumOrder?.toString() || '0',
+          preparationTime: restaurantInfo?.preparationTime?.toString() || '30',
+        });
+
+        // Fetch all orders for this restaurant (for stats)
+        const ordersResponse = await fetch(`${API_BASE_URL}/orders/restaurant/${currentRestaurantId}`);
+        if (ordersResponse.ok) {
+          const ordersData = await ordersResponse.json();
+          const orders = ordersData.orders || [];
+          setAllOrders(orders);
+          // Set recent orders (last 10)
+          setRecentOrders(orders.slice(0, 10));
+        }
+
+        // Fetch menu items
+        const menuResponse = await fetch(`${API_BASE_URL}/restaurants/${currentRestaurantId}/menu`);
+        if (menuResponse.ok) {
+          const menuData = await menuResponse.json();
+          setMenuItems(menuData.menuItems || []);
+        }
+
+        // Fetch operating hours
+        const hoursResponse = await fetch(`${API_BASE_URL}/restaurants/${currentRestaurantId}/hours`);
+        if (hoursResponse.ok) {
+          const hoursData = await hoursResponse.json();
+          const hours = hoursData.hours || [];
+          
+          // Map database hours to component state
+          const hoursMap: any = {
+            monday: { open: '', close: '', closed: true },
+            tuesday: { open: '', close: '', closed: true },
+            wednesday: { open: '', close: '', closed: true },
+            thursday: { open: '', close: '', closed: true },
+            friday: { open: '', close: '', closed: true },
+            saturday: { open: '', close: '', closed: true },
+            sunday: { open: '', close: '', closed: true }
+          };
+          
+          // Map weekday numbers to day names
+          const dayMap: { [key: number]: string } = {
+            0: 'sunday',
+            1: 'monday',
+            2: 'tuesday',
+            3: 'wednesday',
+            4: 'thursday',
+            5: 'friday',
+            6: 'saturday'
+          };
+          
+          hours.forEach((h: any) => {
+            const dayName = dayMap[h.weekday];
+            if (dayName) {
+              hoursMap[dayName] = {
+                open: h.openTime || '',
+                close: h.closeTime || '',
+                closed: h.isClosed || false
+              };
+            }
+          });
+          
+          setOperatingHours(hoursMap);
+        }
+
+        setError(null);
+      } catch (err: any) {
+        console.error('Error fetching restaurant data:', err);
+        setError(err.message || 'Failed to load restaurant data');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    if (currentRestaurantId && currentRestaurantId > 0) {
+      fetchRestaurantData();
+    }
+  }, [currentRestaurantId]);
+
+  // Calculate stats from orders using useMemo to recalculate when allOrders changes
+  const stats = useMemo(() => {
+    if (!allOrders || allOrders.length === 0) {
+      return {
+        todayRevenue: 0,
+        ordersToday: 0,
+        avgOrderValue: 0,
+        revenueChange: '0',
+        orderChange: '0',
+        totalOrders: 0
+      };
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Filter today's orders
+    const todayOrders = allOrders.filter((order: any) => {
+      if (!order.orderTime) return false;
+      try {
+        const orderDate = new Date(order.orderTime);
+        orderDate.setHours(0, 0, 0, 0);
+        return orderDate.getTime() === today.getTime();
+      } catch (e) {
+        return false;
+      }
+    });
+    
+    // Calculate today's revenue
+    const todayRevenue = todayOrders.reduce((sum: number, order: any) => {
+      return sum + (parseFloat(order.grandTotal) || 0);
+    }, 0);
+    
+    // Count today's orders
+    const ordersToday = todayOrders.length;
+    
+    // Calculate average order value (all time)
+    const avgOrderValue = allOrders.length > 0
+      ? allOrders.reduce((sum: number, order: any) => sum + (parseFloat(order.grandTotal) || 0), 0) / allOrders.length
+      : 0;
+    
+    // Get yesterday's orders for comparison
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayOrders = allOrders.filter((order: any) => {
+      if (!order.orderTime) return false;
+      try {
+        const orderDate = new Date(order.orderTime);
+        orderDate.setHours(0, 0, 0, 0);
+        return orderDate.getTime() === yesterday.getTime();
+      } catch (e) {
+        return false;
+      }
+    });
+    const yesterdayRevenue = yesterdayOrders.reduce((sum: number, order: any) => {
+      return sum + (parseFloat(order.grandTotal) || 0);
+    }, 0);
+    const yesterdayCount = yesterdayOrders.length;
+    
+    // Calculate revenue change
+    const revenueChange = yesterdayRevenue > 0
+      ? ((todayRevenue - yesterdayRevenue) / yesterdayRevenue * 100).toFixed(1)
+      : todayRevenue > 0 ? '100' : '0';
+    
+    // Calculate order count change
+    const orderChange = yesterdayCount > 0
+      ? (todayOrders.length - yesterdayCount).toString()
+      : todayOrders.length > 0 ? `+${todayOrders.length}` : '0';
+    
+    return {
+      todayRevenue,
+      ordersToday,
+      avgOrderValue,
+      revenueChange,
+      orderChange,
+      totalOrders: allOrders.length
+    };
+  }, [allOrders]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -146,13 +302,139 @@ export default function RestaurantDashboard({ onBack }: RestaurantDashboardProps
     }));
   };
 
-  const handleLeaveFrontDash = () => {
-    // In a real app, this would remove the restaurant from the platform
-    console.log('Restaurant leaving FrontDash platform');
-    setIsLeaveDialogOpen(false);
-    // Redirect to homepage or show success message
-    onBack();
+  const handleSaveChanges = async () => {
+    if (!currentRestaurantId) {
+      setError('Restaurant ID not found');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+
+      // Update restaurant information
+      const restaurantUpdates: any = {
+        restaurantName: formData.restaurantName,
+        phone: formData.phone,
+      };
+
+      const updateResponse = await fetch(`${API_BASE_URL}/restaurants/${currentRestaurantId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(restaurantUpdates),
+      });
+
+      if (!updateResponse.ok) {
+        throw new Error('Failed to update restaurant information');
+      }
+
+      // Update operating hours
+      const hoursArray = Object.entries(operatingHours).map(([day, hours]) => ({
+        restaurantId: currentRestaurantId,
+        dayOfWeek: day as any,
+        openTime: hours.open || '09:00',
+        closeTime: hours.close || '17:00',
+        isClosed: hours.closed || false,
+      }));
+
+      const hoursResponse = await fetch(`${API_BASE_URL}/restaurants/${currentRestaurantId}/hours`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ hours: hoursArray }),
+      });
+
+      if (!hoursResponse.ok) {
+        throw new Error('Failed to update operating hours');
+      }
+
+      // Refresh restaurant data
+      const restaurantResponse = await fetch(`${API_BASE_URL}/restaurants/${currentRestaurantId}`);
+      if (restaurantResponse.ok) {
+        const restaurantData = await restaurantResponse.json();
+        setRestaurant(restaurantData.restaurant);
+        // Update form data with refreshed values
+        setFormData({
+          restaurantName: restaurantData.restaurant?.restaurantName || '',
+          phone: restaurantData.restaurant?.phone || '',
+          description: restaurantData.restaurant?.description || '',
+          deliveryFee: restaurantData.restaurant?.deliveryFee?.toString() || '0',
+          minimumOrder: restaurantData.restaurant?.minimumOrder?.toString() || '0',
+          preparationTime: restaurantData.restaurant?.preparationTime?.toString() || '30',
+        });
+      }
+
+      // Show success message
+      alert('Settings saved successfully!');
+    } catch (err: any) {
+      console.error('Error saving changes:', err);
+      setError(err.message || 'Failed to save changes');
+      alert('Failed to save changes: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
   };
+
+  const handleLeaveFrontDash = async () => {
+    if (!currentRestaurantId) {
+      alert('Restaurant ID not found. Please sign in again.');
+      return;
+    }
+
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+      const response = await fetch(`${API_BASE_URL}/restaurants/${currentRestaurantId}/withdraw`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        alert(data.error || 'Failed to submit withdrawal request');
+        return;
+      }
+
+      alert('Withdrawal request submitted successfully. Your request is pending admin approval.');
+      setIsLeaveDialogOpen(false);
+      // Optionally redirect to homepage
+      onBack();
+    } catch (error: any) {
+      console.error('Withdrawal request error:', error);
+      alert('Failed to submit withdrawal request: ' + error.message);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading restaurant data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6 text-center">
+            <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+            <h2 className="text-xl font-bold mb-2">Error Loading Dashboard</h2>
+            <p className="text-muted-foreground mb-4">{error}</p>
+            <Button onClick={onBack}>Go Back</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -168,8 +450,12 @@ export default function RestaurantDashboard({ onBack }: RestaurantDashboardProps
                 </div>
               </div>
               <span className="text-muted-foreground">|</span>
-              <span className="text-foreground font-medium">Mario's Pizzeria</span>
-              <Badge className="bg-green-500/20 text-green-500">Active</Badge>
+              <span className="text-foreground font-medium">
+                {loading ? 'Loading...' : restaurant?.restaurantName || 'Restaurant Dashboard'}
+              </span>
+              <Badge className={restaurant?.status === 'approved' ? 'bg-green-500/20 text-green-500' : 'bg-yellow-500/20 text-yellow-500'}>
+                {restaurant?.status === 'approved' ? 'Active' : restaurant?.status || 'Pending'}
+              </Badge>
             </div>
             <div className="flex items-center space-x-4">
               <Button variant="ghost" size="icon">
@@ -204,11 +490,17 @@ export default function RestaurantDashboard({ onBack }: RestaurantDashboardProps
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Today's Revenue</p>
-                      <p className="text-2xl font-bold text-foreground">$543.20</p>
-                      <p className="text-xs text-green-500 flex items-center mt-1">
-                        <TrendingUp className="h-3 w-3 mr-1" />
-                        +12% from yesterday
+                      <p className="text-2xl font-bold text-foreground">
+                        ${stats.todayRevenue.toFixed(2)}
                       </p>
+                      {parseFloat(stats.revenueChange) !== 0 && (
+                        <p className={`text-xs flex items-center mt-1 ${
+                          parseFloat(stats.revenueChange) > 0 ? 'text-green-500' : 'text-red-500'
+                        }`}>
+                        <TrendingUp className="h-3 w-3 mr-1" />
+                          {parseFloat(stats.revenueChange) > 0 ? '+' : ''}{stats.revenueChange}% from yesterday
+                      </p>
+                      )}
                     </div>
                     <div className="p-3 bg-primary/20 rounded-lg">
                       <DollarSign className="h-6 w-6 text-primary" />
@@ -222,11 +514,15 @@ export default function RestaurantDashboard({ onBack }: RestaurantDashboardProps
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Orders Today</p>
-                      <p className="text-2xl font-bold text-foreground">23</p>
-                      <p className="text-xs text-green-500 flex items-center mt-1">
+                      <p className="text-2xl font-bold text-foreground">{stats.ordersToday}</p>
+                      {parseInt(stats.orderChange) !== 0 && (
+                        <p className={`text-xs flex items-center mt-1 ${
+                          parseInt(stats.orderChange) > 0 ? 'text-green-500' : 'text-red-500'
+                        }`}>
                         <TrendingUp className="h-3 w-3 mr-1" />
-                        +5 from yesterday
+                          {parseInt(stats.orderChange) > 0 ? '+' : ''}{stats.orderChange} from yesterday
                       </p>
+                      )}
                     </div>
                     <div className="p-3 bg-green-500/20 rounded-lg">
                       <Package className="h-6 w-6 text-green-500" />
@@ -239,9 +535,13 @@ export default function RestaurantDashboard({ onBack }: RestaurantDashboardProps
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-muted-foreground">Avg. Rating</p>
-                      <p className="text-2xl font-bold text-foreground">4.8</p>
-                      <p className="text-xs text-muted-foreground mt-1">Based on 127 reviews</p>
+                      <p className="text-sm text-muted-foreground">Avg. Order Value</p>
+                      <p className="text-2xl font-bold text-foreground">
+                        ${stats.avgOrderValue.toFixed(2)}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Based on {stats.totalOrders} {stats.totalOrders === 1 ? 'order' : 'orders'}
+                      </p>
                     </div>
                     <div className="p-3 bg-yellow-500/20 rounded-lg">
                       <Star className="h-6 w-6 text-yellow-500" />
@@ -255,10 +555,11 @@ export default function RestaurantDashboard({ onBack }: RestaurantDashboardProps
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Prep Time</p>
-                      <p className="text-2xl font-bold text-foreground">22m</p>
-                      <p className="text-xs text-green-500 flex items-center mt-1">
-                        <TrendingUp className="h-3 w-3 mr-1" />
-                        2m faster than avg
+                      <p className="text-2xl font-bold text-foreground">
+                        {restaurant?.preparationTime || 30}m
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Average preparation time
                       </p>
                     </div>
                     <div className="p-3 bg-blue-500/20 rounded-lg">
@@ -281,30 +582,52 @@ export default function RestaurantDashboard({ onBack }: RestaurantDashboardProps
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {recentOrders.map((order) => (
-                    <div key={order.id} className="flex items-center justify-between p-4 bg-background/50 rounded-lg border border-white/10">
+                  {recentOrders.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-8">No recent orders</p>
+                  ) : (
+                    recentOrders.map((order: any) => {
+                      const orderDate = new Date(order.orderTime);
+                      const formattedTime = orderDate.toLocaleString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      });
+                      const orderNumber = order.orderNumber || `#${order.orderId}`;
+                      const customerCode = order.uniqueCustomerCode ? `Customer #${order.uniqueCustomerCode}` : 'Guest';
+                      
+                      return (
+                        <div key={order.orderId} className="flex items-center justify-between p-4 bg-background/50 rounded-lg border border-white/10">
                       <div className="flex items-center space-x-4">
                         <div>
-                          <p className="font-medium text-foreground">Order #{order.id}</p>
-                          <p className="text-sm text-muted-foreground">{order.customer}</p>
+                              <p className="font-medium text-foreground">Order {orderNumber}</p>
+                              <p className="text-sm text-muted-foreground">{customerCode}</p>
                         </div>
                         <div>
-                          <p className="text-sm text-foreground">{order.items}</p>
-                          <p className="text-sm text-muted-foreground">{order.time}</p>
+                              <p className="text-sm text-foreground">${order.grandTotal?.toFixed(2) || '0.00'}</p>
+                              <p className="text-sm text-muted-foreground">{formattedTime}</p>
                         </div>
                       </div>
                       <div className="flex items-center space-x-4">
                         <div className="text-right">
-                          <p className="font-medium text-foreground">${order.total}</p>
-                          <p className="text-xs text-muted-foreground">{order.estimatedReady}</p>
+                              <p className="text-xs text-muted-foreground">
+                                Subtotal: ${order.subtotal?.toFixed(2) || '0.00'}
+                              </p>
+                              {order.tip > 0 && (
+                                <p className="text-xs text-muted-foreground">
+                                  Tip: ${order.tip?.toFixed(2) || '0.00'}
+                                </p>
+                              )}
                         </div>
-                        <Badge className={`${getStatusColor(order.status)} flex items-center space-x-1`}>
-                          {getStatusIcon(order.status)}
-                          <span className="capitalize">{order.status}</span>
+                            <Badge className={`${getStatusColor(order.orderStatus || order.status)} flex items-center space-x-1`}>
+                              {getStatusIcon(order.orderStatus || order.status)}
+                              <span className="capitalize">{order.orderStatus || order.status}</span>
                         </Badge>
                       </div>
                     </div>
-                  ))}
+                      );
+                    })
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -318,27 +641,89 @@ export default function RestaurantDashboard({ onBack }: RestaurantDashboardProps
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {recentOrders.map((order) => (
-                    <div key={order.id} className="p-4 bg-background/50 rounded-lg border border-white/10">
+                  {recentOrders.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-8">No orders found</p>
+                  ) : (
+                    recentOrders.map((order: any) => {
+                      const orderDate = new Date(order.orderTime);
+                      const formattedTime = orderDate.toLocaleString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      });
+                      const orderNumber = order.orderNumber || `#${order.orderId}`;
+                      const customerCode = order.uniqueCustomerCode ? `Customer #${order.uniqueCustomerCode}` : 'Guest';
+                      const orderStatus = order.orderStatus || order.status;
+                      
+                      return (
+                        <div key={order.orderId} className="p-4 bg-background/50 rounded-lg border border-white/10">
                       <div className="flex items-center justify-between mb-4">
                         <div>
-                          <h4 className="font-medium text-foreground">Order #{order.id}</h4>
-                          <p className="text-sm text-muted-foreground">Customer: {order.customer} • {order.time}</p>
+                              <h4 className="font-medium text-foreground">Order {orderNumber}</h4>
+                              <p className="text-sm text-muted-foreground">
+                                {customerCode} • {formattedTime}
+                              </p>
                         </div>
-                        <Badge className={getStatusColor(order.status)}>
-                          {getStatusIcon(order.status)}
-                          <span className="ml-1 capitalize">{order.status}</span>
+                            <Badge className={getStatusColor(orderStatus)}>
+                              {getStatusIcon(orderStatus)}
+                              <span className="ml-1 capitalize">{orderStatus}</span>
                         </Badge>
                       </div>
                       
                       <div className="mb-4">
-                        <p className="text-sm text-foreground">{order.items}</p>
-                        <p className="text-lg font-medium text-foreground mt-1">Total: ${order.total}</p>
+                            <div className="flex justify-between text-sm mb-2">
+                              <span className="text-muted-foreground">Subtotal:</span>
+                              <span className="text-foreground">${order.subtotal?.toFixed(2) || '0.00'}</span>
+                            </div>
+                            {order.tip > 0 && (
+                              <div className="flex justify-between text-sm mb-2">
+                                <span className="text-muted-foreground">Tip:</span>
+                                <span className="text-foreground">${order.tip?.toFixed(2) || '0.00'}</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between mt-2 pt-2 border-t border-white/10">
+                              <span className="text-foreground font-medium">Total:</span>
+                              <span className="text-lg font-bold text-foreground">${order.grandTotal?.toFixed(2) || '0.00'}</span>
+                            </div>
                       </div>
 
-                      {order.status === 'preparing' && (
+                          {(orderStatus === 'preparing' || orderStatus === 'confirmed' || orderStatus === 'pending') && (
                         <div className="flex space-x-2">
-                          <Button size="sm" className="bg-green-500 hover:bg-green-600">
+                              <Button 
+                                size="sm" 
+                                className="bg-green-500 hover:bg-green-600"
+                                onClick={async () => {
+                                  try {
+                                    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+                                    const response = await fetch(`${API_BASE_URL}/orders/${order.orderId}/status`, {
+                                      method: 'PATCH',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                      },
+                                      body: JSON.stringify({ status: 'ready' }),
+                                    });
+                                    
+                                    if (response.ok) {
+                                      // Refresh orders
+                                      const ordersResponse = await fetch(`${API_BASE_URL}/orders/restaurant/${currentRestaurantId}`);
+                                      if (ordersResponse.ok) {
+                                        const ordersData = await ordersResponse.json();
+                                        const orders = ordersData.orders || [];
+                                        setAllOrders(orders);
+                                        setRecentOrders(orders.slice(0, 10));
+                                      }
+                                      alert('Order marked as ready!');
+                                    } else {
+                                      throw new Error('Failed to update order status');
+                                    }
+                                  } catch (err: any) {
+                                    console.error('Error updating order status:', err);
+                                    alert('Failed to update order status: ' + err.message);
+                                  }
+                                }}
+                              >
                             Mark Ready
                           </Button>
                           <Button size="sm" variant="outline" className="border-white/20">
@@ -347,7 +732,9 @@ export default function RestaurantDashboard({ onBack }: RestaurantDashboardProps
                         </div>
                       )}
                     </div>
-                  ))}
+                      );
+                    })
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -386,9 +773,9 @@ export default function RestaurantDashboard({ onBack }: RestaurantDashboardProps
                         <div className="text-right">
                           <p className="text-lg font-medium text-foreground">${item.price}</p>
                           <div className="flex items-center space-x-2">
-                            <Switch checked={item.available} />
+                            <Switch checked={item.isAvailable !== false} />
                             <span className="text-xs text-muted-foreground">
-                              {item.available ? 'Available' : 'Unavailable'}
+                              {item.isAvailable !== false ? 'Available' : 'Unavailable'}
                             </span>
                           </div>
                         </div>
@@ -453,7 +840,7 @@ export default function RestaurantDashboard({ onBack }: RestaurantDashboardProps
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Average Order Value</span>
-                      <span className="font-medium">$23.60</span>
+                      <span className="font-medium">${stats.avgOrderValue.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Peak Hours</span>
@@ -475,18 +862,27 @@ export default function RestaurantDashboard({ onBack }: RestaurantDashboardProps
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-2">Restaurant Name</label>
-                    <Input defaultValue="Mario's Pizzeria" className="bg-card/50 border-white/10" />
+                    <Input 
+                      value={formData.restaurantName}
+                      onChange={(e) => setFormData({ ...formData, restaurantName: e.target.value })}
+                      className="bg-card/50 border-white/10" 
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-2">Phone Number</label>
-                    <Input defaultValue="(555) 123-4567" className="bg-card/50 border-white/10" />
+                    <Input 
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      className="bg-card/50 border-white/10" 
+                    />
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium mb-2">Description</label>
                   <Textarea 
-                    defaultValue="Authentic Italian cuisine with fresh ingredients and traditional recipes passed down through generations."
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     className="bg-card/50 border-white/10"
                   />
                 </div>
@@ -494,15 +890,30 @@ export default function RestaurantDashboard({ onBack }: RestaurantDashboardProps
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-2">Delivery Fee</label>
-                    <Input defaultValue="$2.99" className="bg-card/50 border-white/10" />
+                    <Input 
+                      value={formData.deliveryFee}
+                      onChange={(e) => setFormData({ ...formData, deliveryFee: e.target.value.replace('$', '') })}
+                      placeholder="$0.00"
+                      className="bg-card/50 border-white/10" 
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-2">Minimum Order</label>
-                    <Input defaultValue="$15.00" className="bg-card/50 border-white/10" />
+                    <Input 
+                      value={formData.minimumOrder}
+                      onChange={(e) => setFormData({ ...formData, minimumOrder: e.target.value.replace('$', '') })}
+                      placeholder="$0.00"
+                      className="bg-card/50 border-white/10" 
+                    />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-2">Prep Time</label>
-                    <Input defaultValue="25 minutes" className="bg-card/50 border-white/10" />
+                    <label className="block text-sm font-medium mb-2">Prep Time (minutes)</label>
+                    <Input 
+                      value={formData.preparationTime}
+                      onChange={(e) => setFormData({ ...formData, preparationTime: e.target.value.replace(/\D/g, '') })}
+                      placeholder="30"
+                      className="bg-card/50 border-white/10" 
+                    />
                   </div>
                 </div>
 
@@ -593,8 +1004,12 @@ export default function RestaurantDashboard({ onBack }: RestaurantDashboardProps
                 </div>
 
                 <div className="flex justify-between pt-6">
-                  <Button className="bg-primary hover:bg-primary/80">
-                    Save Changes
+                  <Button 
+                    className="bg-primary hover:bg-primary/80"
+                    onClick={handleSaveChanges}
+                    disabled={saving}
+                  >
+                    {saving ? 'Saving...' : 'Save Changes'}
                   </Button>
                   
                   <Dialog open={isLeaveDialogOpen} onOpenChange={setIsLeaveDialogOpen}>

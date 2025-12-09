@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
@@ -10,6 +10,8 @@ import { Label } from './ui/label';
 import { Separator } from './ui/separator';
 import { ScrollArea } from './ui/scroll-area';
 import { CheckCircle, XCircle, UserPlus, UserX, Car, LogOut, Building2, Users, Truck, Eye, MapPin, Phone, Mail, Clock, DollarSign } from 'lucide-react';
+import { getPendingRestaurants, getApprovedRestaurants } from '../services/restaurantService';
+import { approveRestaurant } from '../services/emailService';
 
 interface AdminDashboardProps {
   onBack: () => void;
@@ -18,146 +20,9 @@ interface AdminDashboardProps {
   onRejectRestaurant?: (id: number) => void;
 }
 
-// Mock data with detailed registration information
-const pendingRegistrations = [
-  { 
-    id: 1, 
-    name: "Mario's Pizza", 
-    email: "mario@pizza.com", 
-    phone: "+1234567890", 
-    status: "pending", 
-    submittedAt: "2024-01-15",
-    details: {
-      restaurantName: "Mario's Pizza",
-      description: "Authentic Italian pizzas made with fresh ingredients and traditional recipes. Family-owned restaurant serving the community for over 20 years.",
-      cuisineType: "Italian",
-      establishedYear: "2003",
-      address: "123 Main Street",
-      city: "New York",
-      state: "NY",
-      zipCode: "10001",
-      website: "https://www.mariospizza.com",
-      averagePrice: "$",
-      deliveryFee: "2.99",
-      minimumOrder: "15.00",
-      preparationTime: "25",
-      businessLicense: "BL123456789",
-      taxId: "12-3456789", 
-      ownerName: "Mario Giuseppe",
-      operatingHours: {
-        monday: { open: '11:00', close: '22:00', closed: false },
-        tuesday: { open: '11:00', close: '22:00', closed: false },
-        wednesday: { open: '11:00', close: '22:00', closed: false },
-        thursday: { open: '11:00', close: '22:00', closed: false },
-        friday: { open: '11:00', close: '23:00', closed: false },
-        saturday: { open: '11:00', close: '23:00', closed: false },
-        sunday: { open: '12:00', close: '21:00', closed: false }
-      },
-      menuItems: [
-        { name: "Margherita Pizza", description: "Fresh mozzarella, basil, tomato sauce", price: "16.99", category: "Pizza" },
-        { name: "Pepperoni Pizza", description: "Classic pepperoni with mozzarella cheese", price: "18.99", category: "Pizza" },
-        { name: "Caesar Salad", description: "Romaine lettuce, parmesan, croutons, caesar dressing", price: "12.99", category: "Salads" }
-      ]
-    }
-  },
-  { 
-    id: 2, 
-    name: "Sushi Express", 
-    email: "info@sushiexpress.com", 
-    phone: "+1234567891", 
-    status: "pending", 
-    submittedAt: "2024-01-16",
-    details: {
-      restaurantName: "Sushi Express",
-      description: "Fresh sushi and Japanese cuisine prepared by experienced chefs. Fast delivery with the highest quality ingredients.",
-      cuisineType: "Japanese",
-      establishedYear: "2019",
-      address: "456 Oak Avenue",
-      city: "Los Angeles",
-      state: "CA",
-      zipCode: "90210",
-      website: "https://www.sushiexpress.com",
-      averagePrice: "$$",
-      deliveryFee: "3.99",
-      minimumOrder: "25.00",
-      preparationTime: "35",
-      businessLicense: "BL987654321",
-      taxId: "98-7654321",
-      ownerName: "Hiroshi Tanaka",
-      operatingHours: {
-        monday: { open: '11:30', close: '21:30', closed: false },
-        tuesday: { open: '11:30', close: '21:30', closed: false },
-        wednesday: { open: '11:30', close: '21:30', closed: false },
-        thursday: { open: '11:30', close: '21:30', closed: false },
-        friday: { open: '11:30', close: '22:00', closed: false },
-        saturday: { open: '11:30', close: '22:00', closed: false },
-        sunday: { open: '', close: '', closed: true }
-      },
-      menuItems: [
-        { name: "California Roll", description: "Crab, avocado, cucumber with sesame seeds", price: "8.99", category: "Rolls" },
-        { name: "Salmon Nigiri", description: "Fresh salmon over seasoned rice (2 pieces)", price: "6.99", category: "Nigiri" },
-        { name: "Chicken Teriyaki", description: "Grilled chicken with teriyaki sauce and steamed rice", price: "14.99", category: "Entrees" }
-      ]
-    }
-  },
-  { 
-    id: 3, 
-    name: "Burger Palace", 
-    email: "contact@burgerpalace.com", 
-    phone: "+1234567892", 
-    status: "pending", 
-    submittedAt: "2024-01-17",
-    details: {
-      restaurantName: "Burger Palace",
-      description: "Gourmet burgers made with premium beef and fresh toppings. Locally sourced ingredients and craft beer selection.",
-      cuisineType: "American",
-      establishedYear: "2021",
-      address: "789 Elm Street",
-      city: "Chicago",
-      state: "IL",
-      zipCode: "60601",
-      website: "https://www.burgerpalace.com",
-      averagePrice: "$",
-      deliveryFee: "2.49",
-      minimumOrder: "12.00",
-      preparationTime: "20",
-      businessLicense: "BL456789123",
-      taxId: "45-6789123",
-      ownerName: "Jake Williams", 
-      operatingHours: {
-        monday: { open: '10:00', close: '21:00', closed: false },
-        tuesday: { open: '10:00', close: '21:00', closed: false },
-        wednesday: { open: '10:00', close: '21:00', closed: false },
-        thursday: { open: '10:00', close: '22:00', closed: false },
-        friday: { open: '10:00', close: '23:00', closed: false },
-        saturday: { open: '10:00', close: '23:00', closed: false },
-        sunday: { open: '11:00', close: '20:00', closed: false }
-      },
-      menuItems: [
-        { name: "Palace Burger", description: "Double beef patty, cheddar, lettuce, tomato, special sauce", price: "13.99", category: "Burgers" },
-        { name: "BBQ Bacon Burger", description: "Beef patty, bacon, BBQ sauce, onion rings, cheddar", price: "15.99", category: "Burgers" },
-        { name: "Sweet Potato Fries", description: "Crispy sweet potato fries with chipotle mayo", price: "7.99", category: "Sides" }
-      ]
-    }
-  },
-];
+// Removed hardcoded data - now fetched from API
 
-const pendingWithdrawals = [
-  { id: 1, restaurantName: "Tony's Italian", amount: "$2,450.00", requestedAt: "2024-01-18", status: "pending" },
-  { id: 2, restaurantName: "Dragon Wok", amount: "$1,800.50", requestedAt: "2024-01-19", status: "pending" },
-];
-
-const staffMembers = [
-  { id: 1, name: "Sarah Johnson", role: "Support Manager", email: "sarah@frontdash.com", joinedAt: "2023-06-15" },
-  { id: 2, name: "Mike Chen", role: "Operations Lead", email: "mike@frontdash.com", joinedAt: "2023-08-20" },
-  { id: 3, name: "Lisa Rodriguez", role: "Customer Success", email: "lisa@frontdash.com", joinedAt: "2023-09-10" },
-];
-
-const drivers = [
-  { id: 1, name: "Alex Thompson", vehicle: "Honda Civic", license: "DL123456", status: "active", joinedAt: "2024-01-10" },
-  { id: 2, name: "Jordan Williams", vehicle: "Toyota Camry", license: "DL789012", status: "active", joinedAt: "2024-01-12" },
-  { id: 3, name: "Casey Brown", vehicle: "Ford Focus", license: "DL345678", status: "inactive", joinedAt: "2024-01-14" },
-];
+// Removed hardcoded data - now fetched from API
 
 export default function AdminDashboard({ 
   onBack, 
@@ -168,15 +33,99 @@ export default function AdminDashboard({
   const [activeTab, setActiveTab] = useState("drivers");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });
-  const [newStaffForm, setNewStaffForm] = useState({ name: "", role: "", email: "" });
-  const [newDriverForm, setNewDriverForm] = useState({ name: "", vehicle: "", license: "" });
+  const [newStaffForm, setNewStaffForm] = useState({ username: "", firstName: "", lastName: "", password: "" });
+  const [newDriverForm, setNewDriverForm] = useState({ name: "" });
   const [selectedRegistration, setSelectedRegistration] = useState<any>(null);
+  const [pendingRegistrations, setPendingRegistrations] = useState<any[]>(propPendingRegistrations);
+  const [approvedRestaurants, setApprovedRestaurants] = useState<any[]>([]);
+  const [pendingWithdrawals, setPendingWithdrawals] = useState<any[]>([]);
+  const [staffMembers, setStaffMembers] = useState<any[]>([]);
+  const [drivers, setDrivers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [removedStaff, setRemovedStaff] = useState<Set<string>>(new Set());
+  const [deactivatedDrivers, setDeactivatedDrivers] = useState<Set<number>>(new Set());
+  const [approvedWithdrawals, setApprovedWithdrawals] = useState<Set<number>>(new Set());
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
 
-  const handleLogin = (e: React.FormEvent) => {
+  // Fetch all data from API
+  useEffect(() => {
+    async function fetchAllData() {
+      try {
+        setLoading(true);
+        const [pending, approved, withdrawalsData, staffData, driversData] = await Promise.all([
+          getPendingRestaurants(),
+          getApprovedRestaurants(),
+          fetch(`${API_BASE_URL}/admin/restaurants/withdrawals`).then(r => r.json()),
+          fetch(`${API_BASE_URL}/staff`).then(r => r.json()),
+          fetch(`${API_BASE_URL}/drivers`).then(r => r.json()),
+        ]);
+        setPendingRegistrations(pending);
+        setApprovedRestaurants(approved);
+        setPendingWithdrawals(withdrawalsData.withdrawals || []);
+        setStaffMembers(staffData.staff || []);
+        setDrivers(driversData.drivers || []);
+      } catch (err: any) {
+        console.error('Error fetching data:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    if (isLoggedIn) {
+      fetchAllData();
+    }
+  }, [isLoggedIn]);
+
+  const handleApproveRestaurant = async (id: number) => {
+    try {
+      // Find restaurant to get email and name
+      const restaurant = pendingRegistrations.find(r => r.id === id);
+      if (!restaurant) return;
+
+      const result = await approveRestaurant(id, restaurant.email, restaurant.restaurantName);
+      if (result.success) {
+        // Refresh the list
+        const [pending, approved] = await Promise.all([
+          getPendingRestaurants(),
+          getApprovedRestaurants(),
+        ]);
+        setPendingRegistrations(pending);
+        setApprovedRestaurants(approved);
+        if (onApproveRestaurant) {
+          onApproveRestaurant(id);
+        }
+      }
+    } catch (err: any) {
+      console.error('Error approving restaurant:', err);
+    }
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simple mock login - in real app, validate against backend
-    if (loginForm.email && loginForm.password) {
-      setIsLoggedIn(true);
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE_URL}/auth/admin/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: loginForm.email,
+          password: loginForm.password,
+        }),
+      });
+      
+      if (response.ok) {
+        setIsLoggedIn(true);
+      } else {
+        const errorData = await response.json();
+        alert(errorData.error || 'Login failed');
+      }
+    } catch (err: any) {
+      console.error('Login error:', err);
+      alert('Login failed: ' + err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -185,11 +134,9 @@ export default function AdminDashboard({
     setLoginForm({ email: "", password: "" });
   };
 
-  const handleApproveRegistration = (id: number) => {
+  const handleApproveRegistration = async (id: number) => {
     console.log(`Approved registration ${id}`);
-    if (onApproveRestaurant) {
-      onApproveRestaurant(id);
-    }
+    await handleApproveRestaurant(id);
   };
 
   const handleRejectRegistration = (id: number) => {
@@ -199,36 +146,176 @@ export default function AdminDashboard({
     }
   };
 
-  const handleApproveWithdrawal = (id: number) => {
-    console.log(`Approved withdrawal ${id}`);
-    // In real app, process withdrawal
+  const handleApproveWithdrawal = async (id: number) => {
+    if (!confirm(`Are you sure you want to approve the withdrawal request for restaurant #${id}?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/restaurants/${id}/approve-withdrawal`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        alert(data.error || 'Failed to approve withdrawal');
+        return;
+      }
+
+      // Mark as approved (will grey out)
+      setApprovedWithdrawals(prev => new Set(prev).add(id));
+      
+      // Remove from pending withdrawals list
+      setPendingWithdrawals(prev => prev.filter(w => w.id !== id));
+      
+      // Also update approved restaurants list to show it as withdrawn
+      setApprovedRestaurants(prev => prev.map(r => 
+        r.id === id ? { ...r, status: 'inactive' } : r
+      ));
+
+      alert('Withdrawal approved successfully. Restaurant has been removed from FrontDash.');
+    } catch (err: any) {
+      console.error('Error approving withdrawal:', err);
+      alert('Failed to approve withdrawal: ' + err.message);
+    }
   };
 
-  const handleRejectWithdrawal = (id: number) => {
-    console.log(`Rejected withdrawal ${id}`);
-    // In real app, reject withdrawal
+  const handleRejectWithdrawal = async (id: number) => {
+    if (!confirm(`Are you sure you want to reject the withdrawal request for restaurant #${id}?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/restaurants/${id}/reject-withdrawal`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        alert(data.error || 'Failed to reject withdrawal');
+        return;
+      }
+
+      // Remove from pending withdrawals
+      setPendingWithdrawals(prev => prev.filter(w => w.id !== id));
+      
+      // Update approved restaurants list to show it's still active
+      setApprovedRestaurants(prev => prev.map(r => 
+        r.id === id ? { ...r, status: 'approved' } : r
+      ));
+
+      alert('Withdrawal rejected successfully. Restaurant remains active on FrontDash.');
+    } catch (err: any) {
+      console.error('Error rejecting withdrawal:', err);
+      alert('Failed to reject withdrawal: ' + err.message);
+    }
   };
 
-  const handleAddStaff = (e: React.FormEvent) => {
+  const handleAddStaff = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Adding staff:", newStaffForm);
-    setNewStaffForm({ name: "", role: "", email: "" });
+    try {
+      if (!newStaffForm.username || !newStaffForm.password) {
+        alert('Username and password are required');
+        return;
+      }
+      
+      const response = await fetch(`${API_BASE_URL}/staff`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: newStaffForm.username,
+          password: newStaffForm.password,
+          firstName: newStaffForm.firstName || undefined,
+          lastName: newStaffForm.lastName || undefined,
+        }),
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        alert(`Staff member created successfully! Username: ${newStaffForm.username}`);
+        setNewStaffForm({ username: "", firstName: "", lastName: "", password: "" });
+        // Refresh staff list
+        await fetchAllData();
+      } else {
+        const errorData = await response.json();
+        alert(errorData.error || 'Failed to create staff');
+      }
+    } catch (err: any) {
+      console.error('Error adding staff:', err);
+      alert('Failed to add staff: ' + err.message);
+    }
   };
 
-  const handleDeleteStaff = (id: number) => {
-    console.log(`Deleting staff ${id}`);
-    // In real app, remove from backend
+  const handleDeleteStaff = (username: string) => {
+    if (!confirm(`Are you sure you want to remove staff member ${username}?`)) {
+      return;
+    }
+    
+    // Grey out the staff member (UI only)
+    setRemovedStaff(prev => new Set(prev).add(username));
+    alert(`Staff member ${username} has been marked as removed`);
   };
 
-  const handleHireDriver = (e: React.FormEvent) => {
+  const handleHireDriver = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Hiring driver:", newDriverForm);
-    setNewDriverForm({ name: "", vehicle: "", license: "" });
+    if (!newDriverForm.name.trim()) {
+      alert('Driver name is required');
+      return;
+    }
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/drivers`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: newDriverForm.name.trim(),
+          isActive: true,
+        }),
+      });
+      
+      if (response.ok) {
+        alert('Driver hired successfully!');
+        setNewDriverForm({ name: "" });
+        // Refresh drivers list
+        await fetchAllData();
+      } else {
+        const errorData = await response.json();
+        alert(errorData.error || 'Failed to hire driver');
+      }
+    } catch (err: any) {
+      console.error('Error hiring driver:', err);
+      alert('Failed to hire driver: ' + err.message);
+    }
   };
 
-  const handleFireDriver = (id: number) => {
-    console.log(`Firing driver ${id}`);
-    // In real app, update driver status
+  const handleFireDriver = (driverId: number) => {
+    if (!confirm(`Are you sure you want to deactivate this driver?`)) {
+      return;
+    }
+    
+    // Grey out the driver (UI only)
+    setDeactivatedDrivers(prev => new Set(prev).add(driverId));
+    // Also update the driver's isActive status in the local state for visual feedback
+    setDrivers(prevDrivers => 
+      prevDrivers.map(driver => 
+        driver.driverId === driverId 
+          ? { ...driver, isActive: false }
+          : driver
+      )
+    );
+    alert('Driver has been marked as deactivated');
   };
 
   // Login Screen
@@ -379,35 +466,19 @@ export default function AdminDashboard({
                     </DialogHeader>
                     <form onSubmit={handleHireDriver} className="space-y-4">
                       <div>
-                        <Label htmlFor="driverName">Name</Label>
+                        <Label htmlFor="driverName">Driver Name *</Label>
                         <Input
                           id="driverName"
                           value={newDriverForm.name}
-                          onChange={(e) => setNewDriverForm({ ...newDriverForm, name: e.target.value })}
+                          onChange={(e) => setNewDriverForm({ name: e.target.value })}
                           className="bg-background/50 border-white/20"
+                          placeholder="Enter driver's full name"
                           required
                         />
                       </div>
-                      <div>
-                        <Label htmlFor="driverVehicle">Vehicle</Label>
-                        <Input
-                          id="driverVehicle"
-                          value={newDriverForm.vehicle}
-                          onChange={(e) => setNewDriverForm({ ...newDriverForm, vehicle: e.target.value })}
-                          className="bg-background/50 border-white/20"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="driverLicense">License Number</Label>
-                        <Input
-                          id="driverLicense"
-                          value={newDriverForm.license}
-                          onChange={(e) => setNewDriverForm({ ...newDriverForm, license: e.target.value })}
-                          className="bg-background/50 border-white/20"
-                          required
-                        />
-                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Note: Vehicle and license information can be added later if needed.
+                      </p>
                       <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
                         Hire Driver
                       </Button>
@@ -420,43 +491,117 @@ export default function AdminDashboard({
                 <div className="p-6">
                   <Table>
                     <TableHeader>
-                      <TableRow className="border-white/10">
+                        <TableRow className="border-white/10">
+                        <TableHead>Driver ID</TableHead>
                         <TableHead>Name</TableHead>
-                        <TableHead>Vehicle</TableHead>
-                        <TableHead>License</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead>Joined</TableHead>
                         <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {drivers.map((driver) => (
-                        <TableRow key={driver.id} className="border-white/10">
-                          <TableCell className="font-medium">{driver.name}</TableCell>
-                          <TableCell>{driver.vehicle}</TableCell>
-                          <TableCell>{driver.license}</TableCell>
-                          <TableCell>
-                            <Badge 
-                              variant={driver.status === 'active' ? 'default' : 'secondary'}
-                              className={driver.status === 'active' ? 'bg-green-600' : ''}
-                            >
-                              {driver.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{driver.joinedAt}</TableCell>
-                          <TableCell>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleFireDriver(driver.id)}
-                              className="border-red-500/50 text-red-400 hover:bg-red-500/10"
-                            >
-                              <UserX className="h-4 w-4 mr-1" />
-                              Fire
-                            </Button>
+                      {loading ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center py-8">
+                            <p className="text-muted-foreground">Loading drivers...</p>
                           </TableCell>
                         </TableRow>
-                      ))}
+                      ) : drivers.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center py-8">
+                            <p className="text-muted-foreground">No drivers found</p>
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        drivers.map((driver: any) => {
+                          const isDeactivated = deactivatedDrivers.has(driver.driverId);
+                          const displayActive = isDeactivated ? false : driver.isActive;
+                          
+                          return (
+                            <TableRow 
+                              key={driver.driverId} 
+                              className={`border-white/10 ${isDeactivated ? 'opacity-50 bg-muted/20' : ''}`}
+                            >
+                              <TableCell className={`font-medium ${isDeactivated ? 'text-muted-foreground' : ''}`}>
+                                #{driver.driverId}
+                              </TableCell>
+                              <TableCell className={`font-medium ${isDeactivated ? 'text-muted-foreground' : ''}`}>
+                                {driver.name}
+                              </TableCell>
+                              <TableCell>
+                                <Badge 
+                                  variant={displayActive ? 'default' : 'secondary'}
+                                  className={displayActive ? 'bg-green-600' : ''}
+                                >
+                                  {displayActive ? 'active' : 'inactive'}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                {isDeactivated ? (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      // Restore the driver
+                                      setDeactivatedDrivers(prev => {
+                                        const newSet = new Set(prev);
+                                        newSet.delete(driver.driverId);
+                                        return newSet;
+                                      });
+                                      setDrivers(prevDrivers => 
+                                        prevDrivers.map(d => 
+                                          d.driverId === driver.driverId 
+                                            ? { ...d, isActive: true }
+                                            : d
+                                        )
+                                      );
+                                      alert('Driver reactivated');
+                                    }}
+                                    className="border-green-500/50 text-green-400 hover:bg-green-500/10"
+                                  >
+                                    <CheckCircle className="h-4 w-4 mr-1" />
+                                    Restore
+                                  </Button>
+                                ) : displayActive ? (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleFireDriver(driver.driverId)}
+                                    className="border-red-500/50 text-red-400 hover:bg-red-500/10"
+                                  >
+                                    <UserX className="h-4 w-4 mr-1" />
+                                    Deactivate
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      // Reactivate the driver (UI only)
+                                      setDeactivatedDrivers(prev => {
+                                        const newSet = new Set(prev);
+                                        newSet.delete(driver.driverId);
+                                        return newSet;
+                                      });
+                                      setDrivers(prevDrivers => 
+                                        prevDrivers.map(d => 
+                                          d.driverId === driver.driverId 
+                                            ? { ...d, isActive: true }
+                                            : d
+                                        )
+                                      );
+                                      alert('Driver reactivated');
+                                    }}
+                                    className="border-green-500/50 text-green-400 hover:bg-green-500/10"
+                                  >
+                                    <CheckCircle className="h-4 w-4 mr-1" />
+                                    Activate
+                                  </Button>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
                     </TableBody>
                   </Table>
                 </div>
@@ -483,35 +628,49 @@ export default function AdminDashboard({
                     </DialogHeader>
                     <form onSubmit={handleAddStaff} className="space-y-4">
                       <div>
-                        <Label htmlFor="staffName">Name</Label>
+                        <Label htmlFor="staffUsername">Username *</Label>
                         <Input
-                          id="staffName"
-                          value={newStaffForm.name}
-                          onChange={(e) => setNewStaffForm({ ...newStaffForm, name: e.target.value })}
+                          id="staffUsername"
+                          value={newStaffForm.username}
+                          onChange={(e) => setNewStaffForm({ ...newStaffForm, username: e.target.value })}
                           className="bg-background/50 border-white/20"
+                          placeholder="Enter username (e.g., staff001)"
                           required
                         />
                       </div>
                       <div>
-                        <Label htmlFor="staffRole">Role</Label>
+                        <Label htmlFor="staffPassword">Password *</Label>
                         <Input
-                          id="staffRole"
-                          value={newStaffForm.role}
-                          onChange={(e) => setNewStaffForm({ ...newStaffForm, role: e.target.value })}
+                          id="staffPassword"
+                          type="password"
+                          value={newStaffForm.password}
+                          onChange={(e) => setNewStaffForm({ ...newStaffForm, password: e.target.value })}
                           className="bg-background/50 border-white/20"
+                          placeholder="Enter password"
                           required
                         />
                       </div>
-                      <div>
-                        <Label htmlFor="staffEmail">Email</Label>
-                        <Input
-                          id="staffEmail"
-                          type="email"
-                          value={newStaffForm.email}
-                          onChange={(e) => setNewStaffForm({ ...newStaffForm, email: e.target.value })}
-                          className="bg-background/50 border-white/20"
-                          required
-                        />
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="staffFirstName">First Name</Label>
+                          <Input
+                            id="staffFirstName"
+                            value={newStaffForm.firstName}
+                            onChange={(e) => setNewStaffForm({ ...newStaffForm, firstName: e.target.value })}
+                            className="bg-background/50 border-white/20"
+                            placeholder="Optional"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="staffLastName">Last Name</Label>
+                          <Input
+                            id="staffLastName"
+                            value={newStaffForm.lastName}
+                            onChange={(e) => setNewStaffForm({ ...newStaffForm, lastName: e.target.value })}
+                            className="bg-background/50 border-white/20"
+                            placeholder="Optional"
+                          />
+                        </div>
                       </div>
                       <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
                         Add Staff Member
@@ -526,33 +685,84 @@ export default function AdminDashboard({
                   <Table>
                     <TableHeader>
                       <TableRow className="border-white/10">
-                        <TableHead>Name</TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Joined</TableHead>
+                        <TableHead>Username</TableHead>
+                        <TableHead>First Name</TableHead>
+                        <TableHead>Last Name</TableHead>
+                        <TableHead>First Login</TableHead>
                         <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {staffMembers.map((staff) => (
-                        <TableRow key={staff.id} className="border-white/10">
-                          <TableCell className="font-medium">{staff.name}</TableCell>
-                          <TableCell>{staff.role}</TableCell>
-                          <TableCell>{staff.email}</TableCell>
-                          <TableCell>{staff.joinedAt}</TableCell>
-                          <TableCell>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleDeleteStaff(staff.id)}
-                              className="border-red-500/50 text-red-400 hover:bg-red-500/10"
-                            >
-                              <UserX className="h-4 w-4 mr-1" />
-                              Remove
-                            </Button>
+                      {loading ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-8">
+                            <p className="text-muted-foreground">Loading staff...</p>
                           </TableCell>
                         </TableRow>
-                      ))}
+                      ) : staffMembers.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-8">
+                            <p className="text-muted-foreground">No staff members found</p>
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        staffMembers.map((staff: any) => {
+                          const isRemoved = removedStaff.has(staff.username);
+                          
+                          return (
+                            <TableRow 
+                              key={staff.username} 
+                              className={`border-white/10 ${isRemoved ? 'opacity-50 bg-muted/20' : ''}`}
+                            >
+                              <TableCell className={`font-medium ${isRemoved ? 'text-muted-foreground' : ''}`}>
+                                {staff.username}
+                              </TableCell>
+                              <TableCell className={isRemoved ? 'text-muted-foreground' : ''}>
+                                {staff.firstName || '-'}
+                              </TableCell>
+                              <TableCell className={isRemoved ? 'text-muted-foreground' : ''}>
+                                {staff.lastName || '-'}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={staff.firstLogin ? 'secondary' : 'default'}>
+                                  {staff.firstLogin ? 'Yes' : 'No'}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                {isRemoved ? (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      // Restore the staff member
+                                      setRemovedStaff(prev => {
+                                        const newSet = new Set(prev);
+                                        newSet.delete(staff.username);
+                                        return newSet;
+                                      });
+                                      alert(`Staff member ${staff.username} has been restored`);
+                                    }}
+                                    className="border-green-500/50 text-green-400 hover:bg-green-500/10"
+                                  >
+                                    <CheckCircle className="h-4 w-4 mr-1" />
+                                    Restore
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleDeleteStaff(staff.username)}
+                                    className="border-red-500/50 text-red-400 hover:bg-red-500/10"
+                                  >
+                                    <UserX className="h-4 w-4 mr-1" />
+                                    Remove
+                                  </Button>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
                     </TableBody>
                   </Table>
                 </div>
@@ -811,44 +1021,85 @@ export default function AdminDashboard({
                       <TableHeader>
                         <TableRow className="border-white/10">
                           <TableHead>Restaurant</TableHead>
-                          <TableHead>Amount</TableHead>
-                          <TableHead>Requested</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Phone</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead>Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {pendingWithdrawals.map((withdrawal) => (
-                          <TableRow key={withdrawal.id} className="border-white/10">
-                            <TableCell className="font-medium">{withdrawal.restaurantName}</TableCell>
-                            <TableCell>{withdrawal.amount}</TableCell>
-                            <TableCell>{withdrawal.requestedAt}</TableCell>
-                            <TableCell>
-                              <Badge variant="secondary">{withdrawal.status}</Badge>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex gap-2">
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleApproveWithdrawal(withdrawal.id)}
-                                  className="bg-green-600 hover:bg-green-700 frontdash-glow"
-                                >
-                                  <CheckCircle className="h-4 w-4 mr-1" />
-                                  Approve
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleRejectWithdrawal(withdrawal.id)}
-                                  className="border-red-500/50 text-red-400 hover:bg-red-500/10"
-                                >
-                                  <XCircle className="h-4 w-4 mr-1" />
-                                  Reject
-                                </Button>
-                              </div>
+                        {loading ? (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center py-8">
+                              <p className="text-muted-foreground">Loading withdrawals...</p>
                             </TableCell>
                           </TableRow>
-                        ))}
+                        ) : pendingWithdrawals.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center py-8">
+                              <p className="text-muted-foreground">No pending withdrawals</p>
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          pendingWithdrawals.map((withdrawal: any) => {
+                            const isApproved = approvedWithdrawals.has(withdrawal.id);
+                            return (
+                              <TableRow 
+                                key={withdrawal.id} 
+                                className={`border-white/10 ${isApproved ? 'opacity-50 bg-muted/20' : ''}`}
+                              >
+                                <TableCell className={`font-medium ${isApproved ? 'text-muted-foreground' : ''}`}>
+                                  {withdrawal.restaurantName}
+                                </TableCell>
+                                <TableCell className={isApproved ? 'text-muted-foreground' : ''}>
+                                  {withdrawal.email || '-'}
+                                </TableCell>
+                                <TableCell className={isApproved ? 'text-muted-foreground' : ''}>
+                                  {withdrawal.phone || '-'}
+                                </TableCell>
+                                <TableCell>
+                                  {isApproved ? (
+                                    <Badge variant="secondary" className="bg-red-600/20 text-red-400">
+                                      Removed from FrontDash
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="default" className="bg-yellow-600/20 text-yellow-400">
+                                      Pending
+                                    </Badge>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {isApproved ? (
+                                    <Badge variant="secondary" className="bg-red-600/20 text-red-400">
+                                      Approved
+                                    </Badge>
+                                  ) : (
+                                    <div className="flex gap-2">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleApproveWithdrawal(withdrawal.id)}
+                                        className="border-green-500/50 text-green-400 hover:bg-green-500/10"
+                                      >
+                                        <CheckCircle className="h-4 w-4 mr-1" />
+                                        Approve
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleRejectWithdrawal(withdrawal.id)}
+                                        className="border-red-500/50 text-red-400 hover:bg-red-500/10"
+                                      >
+                                        <XCircle className="h-4 w-4 mr-1" />
+                                        Reject
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
                       </TableBody>
                     </Table>
                   </div>

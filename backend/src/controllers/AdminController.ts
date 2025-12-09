@@ -55,7 +55,7 @@ export class AdminController {
 
       // TODO: Add admin authentication middleware
 
-      const success = adminService.rejectRestaurant(restaurantId);
+      const success = await adminService.rejectRestaurant(restaurantId);
 
       if (!success) {
         res.status(404).json({
@@ -85,7 +85,7 @@ export class AdminController {
     try {
       // TODO: Add admin authentication middleware
 
-      const restaurants = adminService.getPendingRestaurants();
+      const restaurants = await adminService.getPendingRestaurants();
 
       res.json({
         success: true,
@@ -107,7 +107,7 @@ export class AdminController {
     try {
       // TODO: Add admin authentication middleware
 
-      const restaurants = adminService.getApprovedRestaurants();
+      const restaurants = await adminService.getApprovedRestaurants();
 
       res.json({
         success: true,
@@ -117,6 +117,86 @@ export class AdminController {
       res.status(500).json({
         success: false,
         error: error.message || 'Failed to fetch approved restaurants',
+      });
+    }
+  }
+
+  /**
+   * GET /api/admin/restaurants/withdrawals
+   * Get all pending withdrawal requests
+   */
+  async getPendingWithdrawals(req: Request, res: Response): Promise<void> {
+    try {
+      const withdrawals = await adminService.getPendingWithdrawals();
+
+      res.json({
+        success: true,
+        withdrawals,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to fetch pending withdrawals',
+      });
+    }
+  }
+
+  /**
+   * POST /api/admin/restaurants/:id/approve-withdrawal
+   * Approve a withdrawal request
+   */
+  async approveWithdrawal(req: Request, res: Response): Promise<void> {
+    try {
+      const restaurantId = parseInt(req.params.id);
+
+      const success = await adminService.approveWithdrawal(restaurantId);
+
+      if (!success) {
+        res.status(404).json({
+          success: false,
+          error: 'Restaurant not found',
+        });
+        return;
+      }
+
+      res.json({
+        success: true,
+        message: 'Withdrawal approved successfully',
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to approve withdrawal',
+      });
+    }
+  }
+
+  /**
+   * POST /api/admin/restaurants/:id/reject-withdrawal
+   * Reject a withdrawal request
+   */
+  async rejectWithdrawal(req: Request, res: Response): Promise<void> {
+    try {
+      const restaurantId = parseInt(req.params.id);
+
+      const success = await adminService.rejectWithdrawal(restaurantId);
+
+      if (!success) {
+        res.status(404).json({
+          success: false,
+          error: 'Restaurant not found',
+        });
+        return;
+      }
+
+      res.json({
+        success: true,
+        message: 'Withdrawal rejected successfully',
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to reject withdrawal',
       });
     }
   }

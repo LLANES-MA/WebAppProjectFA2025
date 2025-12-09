@@ -24,11 +24,15 @@ export default function RestaurantSignIn({ onBack, onSignInSuccess }: Restaurant
   });
   const [activeTab, setActiveTab] = useState('signin');
   const [errors, setErrors] = useState<{[key: string]: string}>({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   function validateUsername(username: string) {
-    if (!/^[A-Za-z]{2,}\d{2,}$/.test(username)) {
-      return 'Username must have at least 2 letters followed by at least 2 digits';
+    if (!username.trim()) {
+      return 'Username is required';
     }
+    // Restaurant usernames can be email addresses or any format
+    // Just check that it's not empty
     return '';
   }
   function validatePassword(password: string) {
@@ -39,15 +43,58 @@ export default function RestaurantSignIn({ onBack, onSignInSuccess }: Restaurant
     return '';
   }
 
-  const handleSignIn = (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAuthError(null);
+    
     const newErrors: {[key: string]: string} = {};
     newErrors.username = validateUsername(signInForm.username);
     newErrors.password = validatePassword(signInForm.password);
     setErrors(newErrors);
     if (Object.values(newErrors).some(Boolean)) return;
-    console.log('Restaurant owner signing in:', signInForm);
-    onSignInSuccess();
+    
+    setIsLoading(true);
+    
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+      const response = await fetch(`${API_BASE_URL}/auth/restaurant/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: signInForm.username,
+          password: signInForm.password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        setAuthError(data.error || 'Invalid username or password');
+        setIsLoading(false);
+        return;
+      }
+
+      // Authentication successful
+      console.log('✅ Restaurant authentication successful:', data);
+      console.log('📝 Storing restaurantId:', data.restaurantId);
+      
+      // Store restaurant ID in localStorage for dashboard access
+      if (data.restaurantId) {
+        localStorage.setItem('restaurantId', data.restaurantId.toString());
+        console.log('✅ restaurantId stored in localStorage:', localStorage.getItem('restaurantId'));
+      } else {
+        console.error('❌ No restaurantId in response:', data);
+      }
+      
+      setIsLoading(false);
+      onSignInSuccess();
+    } catch (error: any) {
+      console.error('Authentication error:', error);
+      setAuthError('Failed to connect to server. Please try again.');
+      setIsLoading(false);
+    }
   };
 
   const handleSignUp = (e: React.FormEvent) => {
@@ -136,9 +183,19 @@ export default function RestaurantSignIn({ onBack, onSignInSuccess }: Restaurant
                   {errors.password && <p className="text-xs text-destructive mt-1">{errors.password}</p>}
                 </div>
 
-                <Button type="submit" className="w-full bg-primary hover:bg-primary/90 mt-6 frontdash-glow">
+                {authError && (
+                  <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                    <p className="text-sm text-destructive">{authError}</p>
+                  </div>
+                )}
+
+                <Button 
+                  type="submit" 
+                  className="w-full bg-primary hover:bg-primary/90 mt-6 frontdash-glow"
+                  disabled={isLoading}
+                >
                   <Utensils className="h-4 w-4 mr-2" />
-                  Access Restaurant Portal
+                  {isLoading ? 'Signing in...' : 'Access Restaurant Portal'}
                 </Button>
 
                 <div className="text-center">

@@ -39,9 +39,9 @@ export class AuthService {
   /**
    * Create a login entry
    */
-  async createLogin(username: string, password: string): Promise<Login> {
+  async createLogin(username: string, password: string, usertype?: string): Promise<Login> {
     // Check if login already exists
-    const existing = db.getLogin(username);
+    const existing = await db.getLogin(username);
     if (existing) {
       throw new Error(`Login with username ${username} already exists`);
     }
@@ -55,21 +55,35 @@ export class AuthService {
       passwordHash,
     };
 
-    return db.createLogin(loginInput);
+    return await db.createLogin(loginInput, usertype);
   }
 
   /**
    * Authenticate a user
    */
   async authenticate(username: string, password: string): Promise<boolean> {
-    const login = db.getLogin(username);
+    const login = await db.getLogin(username);
     if (!login) {
       return false;
     }
 
-    const isValid = await this.verifyPassword(password, login.passwordHash);
+    // Check if password_hash is a bcrypt hash (starts with $2a$, $2b$, or $2y$)
+    // or if it's plain text (for existing data)
+    const isHashed = login.passwordHash.startsWith('$2a$') || 
+                     login.passwordHash.startsWith('$2b$') || 
+                     login.passwordHash.startsWith('$2y$');
+    
+    let isValid: boolean;
+    if (isHashed) {
+      // Verify against bcrypt hash
+      isValid = await this.verifyPassword(password, login.passwordHash);
+    } else {
+      // Plain text comparison (for existing data)
+      isValid = login.passwordHash === password;
+    }
+    
     if (isValid) {
-      db.updateLastLogin(username);
+      await db.updateLastLogin(username);
     }
     return isValid;
   }
@@ -77,8 +91,8 @@ export class AuthService {
   /**
    * Get login by username
    */
-  getLogin(username: string): Login | undefined {
-    return db.getLogin(username);
+  async getLogin(username: string): Promise<Login | undefined> {
+    return await db.getLogin(username);
   }
 }
 

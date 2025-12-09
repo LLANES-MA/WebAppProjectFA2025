@@ -3,57 +3,8 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Star, Clock, Truck } from 'lucide-react';
 import { ImageWithFallback } from './figma/ImageWithFallback';
-
-const restaurants = [
-  {
-    id: 1,
-    name: "Mario's Pizzeria",
-    cuisine: "Italian",
-    rating: 4.8,
-    deliveryTime: "25-35 min",
-    deliveryFee: "Free",
-    image: "https://images.unsplash.com/photo-1563245738-9169ff58eccf?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwaXp6YSUyMHJlc3RhdXJhbnR8ZW58MXx8fHwxNzU2ODMzNDk5fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    featured: true,
-    promo: "20% OFF",
-    description: "Authentic Italian pizzas made with fresh ingredients and traditional recipes"
-  },
-  {
-    id: 2,
-    name: "Burger Palace",
-    cuisine: "American",
-    rating: 4.6,
-    deliveryTime: "30-40 min",
-    deliveryFee: "$2.99",
-    image: "https://images.unsplash.com/photo-1643757412923-619484c906f2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxidXJnZXIlMjBmb29kfGVufDF8fHx8MTc1NjgyMzQ5M3ww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    featured: false,
-    promo: null,
-    description: "Gourmet burgers made with premium beef and fresh toppings"
-  },
-  {
-    id: 3,
-    name: "Sakura Sushi",
-    cuisine: "Japanese",
-    rating: 4.9,
-    deliveryTime: "35-45 min",
-    deliveryFee: "Free",
-    image: "https://images.unsplash.com/photo-1696449241254-11cf7f18ce32?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzdXNoaSUyMHJlc3RhdXJhbnR8ZW58MXx8fHwxNzU2NzUwNzg4fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    featured: true,
-    promo: "Buy 1 Get 1",
-    description: "Fresh sushi and Japanese cuisine prepared by skilled chefs using premium ingredients"
-  },
-  {
-    id: 4,
-    name: "Nonna's Kitchen",
-    cuisine: "Italian",
-    rating: 4.7,
-    deliveryTime: "20-30 min",
-    deliveryFee: "Free",
-    image: "https://images.unsplash.com/photo-1662197480393-2a82030b7b83?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxpdGFsaWFuJTIwcGFzdGF8ZW58MXx8fHwxNzU2ODIzNDk0fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    featured: false,
-    promo: null,
-    description: "Traditional Italian comfort food and homemade pasta dishes"
-  }
-];
+import { useState, useEffect } from 'react';
+import { getApprovedRestaurants, transformRestaurantForDisplay } from '../services/restaurantService';
 
 interface FeaturedRestaurantsProps {
   onViewAllRestaurants?: () => void;
@@ -61,6 +12,36 @@ interface FeaturedRestaurantsProps {
 }
 
 export default function FeaturedRestaurants({ onViewAllRestaurants, onRestaurantSelect }: FeaturedRestaurantsProps) {
+  const [restaurants, setRestaurants] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchRestaurants() {
+      try {
+        setLoading(true);
+        const approvedRestaurants = await getApprovedRestaurants();
+        // Transform and limit to 4 featured restaurants
+        const transformed = approvedRestaurants
+          .slice(0, 4)
+          .map(restaurant => ({
+            ...transformRestaurantForDisplay(restaurant),
+            featured: true,
+            promo: restaurant.deliveryFee === 0 || restaurant.deliveryFee === 'Free' ? 'Free Delivery' : null,
+          }));
+        setRestaurants(transformed);
+        setError(null);
+      } catch (err: any) {
+        console.error('Error fetching restaurants:', err);
+        setError('Failed to load restaurants');
+        setRestaurants([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchRestaurants();
+  }, []);
   return (
     <section className="py-16 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-transparent to-primary/5">
       <div className="container mx-auto">
@@ -72,6 +53,24 @@ export default function FeaturedRestaurants({ onViewAllRestaurants, onRestaurant
             Top-rated restaurants near you
           </p>
         </div>
+
+        {loading && (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Loading restaurants...</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="text-center py-12">
+            <p className="text-destructive">{error}</p>
+          </div>
+        )}
+
+        {!loading && !error && restaurants.length === 0 && (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">No restaurants available at the moment.</p>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {restaurants.map((restaurant) => (

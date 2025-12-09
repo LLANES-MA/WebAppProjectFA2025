@@ -10,6 +10,8 @@ import { emailService } from './services/EmailService';
 import { orderService } from './services/OrderService';
 import { driverService } from './services/DriverService';
 import { paymentService } from './services/PaymentService';
+import { staffService } from './services/StaffService';
+import { db } from './data/Database';
 
 export class FrontDashMain {
   // Services
@@ -20,6 +22,8 @@ export class FrontDashMain {
   public readonly orderService = orderService;
   public readonly driverService = driverService;
   public readonly paymentService = paymentService;
+  public readonly staffService = staffService;
+  public readonly db = db;
 
   /**
    * Initialize all services

@@ -15,9 +15,10 @@ interface CheckoutProps {
   onGoToAdmin?: () => void;
   onGoToStaff?: () => void;
   onViewAllRestaurants?: () => void;
+  selectedRestaurant?: any; // Restaurant info for order creation
 }
 
-export default function Checkout({ cartItems, total, onBack, onOrderComplete, onRestaurantSignup, onGoToAdmin, onGoToStaff, onViewAllRestaurants }: CheckoutProps) {
+export default function Checkout({ cartItems, total, onBack, onOrderComplete, onRestaurantSignup, onGoToAdmin, onGoToStaff, onViewAllRestaurants, selectedRestaurant }: CheckoutProps) {
   const [step, setStep] = useState(1); // 1: Address, 2: Payment, 3: Confirmation
   const [formData, setFormData] = useState({
     // Address
@@ -143,12 +144,81 @@ export default function Checkout({ cartItems, total, onBack, onOrderComplete, on
   };
 
   const handlePlaceOrder = async () => {
+    if (!selectedRestaurant || !selectedRestaurant.id) {
+      alert('Restaurant information is missing. Please go back and try again.');
+      return;
+    }
+
+    if (cartItems.length === 0) {
+      alert('Your cart is empty.');
+      return;
+    }
+
     setIsProcessing(true);
-    // Simulate payment processing
-    setTimeout(() => {
+    
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+      
+      // Calculate subtotal, tax, tip, and delivery fee
+      const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      const tax = subtotal * 0.08; // 8% tax
+      const deliveryFee = subtotal > 25 ? 0 : 2.99;
+      const tip = 0; // Can be added later if needed
+      const grandTotal = subtotal + tax + deliveryFee + tip;
+      
+      // Create order payload
+      const orderData = {
+        restaurantId: selectedRestaurant.id,
+        subtotal: subtotal,
+        tip: tip,
+        grandTotal: grandTotal,
+        orderStatus: 'pending',
+        address: {
+          street: formData.street,
+          apartment: formData.apartment,
+          city: formData.city,
+          state: formData.state,
+          zipCode: formData.zipCode,
+        },
+        customer: {
+          email: formData.email,
+          phone: formData.phone,
+          fullName: formData.cardName || formData.email.split('@')[0],
+        },
+        items: cartItems.map(item => ({
+          itemId: item.id,
+          itemName: item.name,
+          itemPrice: item.price,
+          quantity: item.quantity,
+          subtotal: item.price * item.quantity,
+        })),
+      };
+      
+      console.log('📝 Creating order:', orderData);
+      
+      const response = await fetch(`${API_BASE_URL}/orders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(orderData),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create order');
+      }
+      
+      const result = await response.json();
+      console.log('✅ Order created successfully:', result);
+      
       setIsProcessing(false);
       onOrderComplete();
-    }, 3000);
+    } catch (err: any) {
+      console.error('❌ Error creating order:', err);
+      setIsProcessing(false);
+      alert('Failed to place order: ' + err.message);
+    }
   };
 
   return (

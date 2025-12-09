@@ -5,7 +5,8 @@ import { Badge } from './ui/badge';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from './ui/sheet';
 import { Input } from './ui/input';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { getRestaurantMenu } from '../services/restaurantService';
 
 interface RestaurantMenuProps {
   restaurant: any;
@@ -21,83 +22,52 @@ interface RestaurantMenuProps {
   onDeliveryAddressChange?: (address: string) => void;
 }
 
-const menuCategories = [
-  {
-    name: "Popular Items",
-    items: [
-      {
-        id: 1,
-        name: "Classic Burger",
-        description: "Juicy beef patty with lettuce, tomato, onion, and our special sauce",
-        price: 12.99,
-        image: "https://images.unsplash.com/photo-1643757412923-619484c906f2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxidXJnZXIlMjBmb29kfGVufDF8fHx8MTc1NjgyMzQ5M3ww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-        category: "Main Course"
-      },
-      {
-        id: 2,
-        name: "Chicken Wings",
-        description: "Crispy wings tossed in your choice of sauce",
-        price: 9.99,
-        image: "https://images.unsplash.com/photo-1643757412923-619484c906f2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxidXJnZXIlMjBmb29kfGVufDF8fHx8MTc1NjgyMzQ5M3ww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-        category: "Appetizers"
-      },
-      {
-        id: 3,
-        name: "Caesar Salad",
-        description: "Fresh romaine lettuce with parmesan cheese and croutons",
-        price: 8.99,
-        image: "https://images.unsplash.com/photo-1662197480393-2a82030b7b83?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxpdGFsaWFuJTIwcGFzdGF8ZW58MXx8fHwxNzU2ODIzNDk0fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-        category: "Salads"
-      }
-    ]
-  },
-  {
-    name: "Main Courses",
-    items: [
-      {
-        id: 4,
-        name: "Grilled Chicken",
-        description: "Tender grilled chicken breast with herbs and spices",
-        price: 15.99,
-        image: "https://images.unsplash.com/photo-1643757412923-619484c906f2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxidXJnZXIlMjBmb29kfGVufDF8fHx8MTc1NjgyMzQ5M3ww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-        category: "Main Course"
-      },
-      {
-        id: 5,
-        name: "Fish & Chips",
-        description: "Beer-battered fish with crispy fries and tartar sauce",
-        price: 14.99,
-        image: "https://images.unsplash.com/photo-1643757412923-619484c906f2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxidXJnZXIlMjBmb29kfGVufDF8fHx8MTc1NjgyMzQ5M3ww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-        category: "Main Course"
-      }
-    ]
-  },
-  {
-    name: "Desserts",
-    items: [
-      {
-        id: 6,
-        name: "Chocolate Cake",
-        description: "Rich chocolate cake with chocolate frosting",
-        price: 6.99,
-        image: "https://images.unsplash.com/photo-1662197480393-2a82030b7b83?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxpdGFsaWFuJTIwcGFzdGF8ZW58MXx8fHwxNzU2ODIzNDk0fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-        category: "Desserts"
-      },
-      {
-        id: 7,
-        name: "Ice Cream Sundae",
-        description: "Vanilla ice cream with hot fudge and whipped cream",
-        price: 5.99,
-        image: "https://images.unsplash.com/photo-1662197480393-2a82030b7b83?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxpdGFsaWFuJTIwcGFzdGF8ZW58MXx8fHwxNzU2ODIzNDk0fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-        category: "Desserts"
-      }
-    ]
-  }
-];
-
 export default function RestaurantMenu({ restaurant, onBack, onViewCart, onRestaurantSignup, onGoToAdmin, onGoToStaff, onViewAllRestaurants, onGoToAccount, onGoToSettings }: RestaurantMenuProps) {
   const [cartItems, setCartItems] = useState<any[]>([]);
   const [quantities, setQuantities] = useState<{[key: number]: number}>({});
+  const [menuItems, setMenuItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch menu items from API
+  useEffect(() => {
+    async function fetchMenu() {
+      if (!restaurant?.id) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const items = await getRestaurantMenu(restaurant.id);
+        setMenuItems(items);
+        setError(null);
+      } catch (err: any) {
+        console.error('Error fetching menu:', err);
+        setError('Failed to load menu items');
+        setMenuItems([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchMenu();
+  }, [restaurant?.id]);
+
+  // Group menu items by category
+  const menuCategories = menuItems.reduce((acc: any[], item: any) => {
+    const categoryName = item.category || 'Other';
+    let category = acc.find(cat => cat.name === categoryName);
+    if (!category) {
+      category = { name: categoryName, items: [] };
+      acc.push(category);
+    }
+    category.items.push({
+      ...item,
+      image: item.imageUrl || `https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&h=300&fit=crop`,
+    });
+    return acc;
+  }, []);
 
   const addToCart = (item: any) => {
     const existingItem = cartItems.find(cartItem => cartItem.id === item.id);
@@ -366,7 +336,25 @@ export default function RestaurantMenu({ restaurant, onBack, onViewCart, onResta
       {/* Menu */}
       <div className="container mx-auto px-6 py-8">
         <div className="space-y-8">
-          {menuCategories.map((category) => (
+          {loading && (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">Loading menu...</p>
+            </div>
+          )}
+
+          {error && (
+            <div className="text-center py-12">
+              <p className="text-destructive">{error}</p>
+            </div>
+          )}
+
+          {!loading && !error && menuCategories.length === 0 && (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">No menu items available.</p>
+            </div>
+          )}
+
+          {!loading && !error && menuCategories.map((category) => (
             <div key={category.name} className="space-y-4">
               <h2 className="text-xl font-semibold text-foreground border-b border-white/10 pb-2">
                 {category.name}
