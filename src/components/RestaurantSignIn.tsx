@@ -14,12 +14,26 @@ interface RestaurantSignInProps {
   onAccountCreated?: (accountData: { email: string; password: string }) => void;
 }
 
+// Generate a random 9-character password
+function generatePassword(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let password = '';
+  // Ensure at least one uppercase, one lowercase, and one number
+  password += chars[Math.floor(Math.random() * 26)]; // Uppercase
+  password += chars[26 + Math.floor(Math.random() * 26)]; // Lowercase
+  password += chars[52 + Math.floor(Math.random() * 10)]; // Number
+  // Fill remaining 6 characters randomly
+  for (let i = 3; i < 9; i++) {
+    password += chars[Math.floor(Math.random() * chars.length)];
+  }
+  // Shuffle the password
+  return password.split('').sort(() => Math.random() - 0.5).join('');
+}
+
 export default function RestaurantSignIn({ onBack, onSignInSuccess, onAccountCreated }: RestaurantSignInProps) {
   const [signInForm, setSignInForm] = useState({ username: '', password: '' });
   const [signUpForm, setSignUpForm] = useState({ 
-    email: '', 
-    password: '', 
-    confirmPassword: ''
+    email: ''
   });
   const [activeTab, setActiveTab] = useState('signin');
   const [errors, setErrors] = useState<{[key: string]: string}>({});
@@ -40,11 +54,11 @@ export default function RestaurantSignIn({ onBack, onSignInSuccess, onAccountCre
     // Just check that it's not empty
     return '';
   }
+
   function validatePassword(password: string) {
-    if (password.length < 6) return 'Password must be at least 6 characters';
-    if (!/[A-Z]/.test(password)) return 'Password must contain an uppercase letter';
-    if (!/[a-z]/.test(password)) return 'Password must contain a lowercase letter';
-    if (!/[0-9]/.test(password)) return 'Password must contain a number';
+    if (!password || password.length === 0) {
+      return 'Password is required';
+    }
     return '';
   }
 
@@ -159,24 +173,18 @@ export default function RestaurantSignIn({ onBack, onSignInSuccess, onAccountCre
       newErrors.email = 'Please enter a valid email address';
     }
     
-    // Validate password
-    newErrors.password = validatePassword(signUpForm.password);
-    
-    // Validate confirm password
-    if (signUpForm.password !== signUpForm.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
-    }
-    
     setErrors(newErrors);
     if (Object.values(newErrors).some(Boolean)) return;
     
-    console.log('Restaurant account creation:', { email: signUpForm.email });
+    // Generate a 9-character password automatically
+    const generatedPassword = generatePassword();
+    console.log('Restaurant account creation:', { email: signUpForm.email, passwordGenerated: true });
     
     // Pass account data to parent component to navigate to registration form
     if (onAccountCreated) {
       onAccountCreated({
         email: signUpForm.email,
-        password: signUpForm.password
+        password: generatedPassword
       });
     }
   };
@@ -437,44 +445,10 @@ export default function RestaurantSignIn({ onBack, onSignInSuccess, onAccountCre
                   {errors.email && <p className="text-xs text-destructive mt-1">{errors.email}</p>}
                 </div>
 
-                <div>
-                  <Label htmlFor="restaurant-signup-password">Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="restaurant-signup-password"
-                      type="password"
-                      value={signUpForm.password}
-                      onChange={(e) => {
-                        setSignUpForm({ ...signUpForm, password: e.target.value });
-                        if (errors.password) setErrors(prev => ({ ...prev, password: '' }));
-                      }}
-                      className={`pl-10 bg-background/50 border-white/20${errors.password ? ' border-destructive' : ''}`}
-                      placeholder="••••••••"
-                      required
-                    />
-                  </div>
-                  {errors.password && <p className="text-xs text-destructive mt-1">{errors.password}</p>}
-                </div>
-
-                <div>
-                  <Label htmlFor="restaurant-signup-confirm-password">Confirm Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="restaurant-signup-confirm-password"
-                      type="password"
-                      value={signUpForm.confirmPassword}
-                      onChange={(e) => {
-                        setSignUpForm({ ...signUpForm, confirmPassword: e.target.value });
-                        if (errors.confirmPassword) setErrors(prev => ({ ...prev, confirmPassword: '' }));
-                      }}
-                      className={`pl-10 bg-background/50 border-white/20${errors.confirmPassword ? ' border-destructive' : ''}`}
-                      placeholder="••••••••"
-                      required
-                    />
-                  </div>
-                  {errors.confirmPassword && <p className="text-xs text-destructive mt-1">{errors.confirmPassword}</p>}
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                  <p className="text-sm text-blue-400">
+                    🔐 A secure 9-character password will be automatically generated for your account.
+                  </p>
                 </div>
 
                 <Button type="submit" className="w-full bg-primary hover:bg-primary/90 mt-6 frontdash-glow">
