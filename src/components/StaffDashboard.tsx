@@ -103,6 +103,8 @@ export default function StaffDashboard({ onBack }: StaffDashboardProps) {
     newPassword: "", 
     confirmPassword: "" 
   });
+  const [passwordErrors, setPasswordErrors] = useState<{ [key: string]: string }>({});
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
   const [searchOrderNumber, setSearchOrderNumber] = useState("");
   const [orders, setOrders] = useState<any[]>([]);
   const [drivers, setDrivers] = useState<any[]>([]);
@@ -294,14 +296,90 @@ export default function StaffDashboard({ onBack }: StaffDashboardProps) {
     setLoginForm({ username: "", password: "" });
   };
 
-  const handleChangePassword = (e: React.FormEvent) => {
+  const validatePassword = (password: string): string => {
+    if (password.length < 6) return 'Password must be at least 6 characters';
+    if (!/[A-Z]/.test(password)) return 'Password must contain an uppercase letter';
+    if (!/[a-z]/.test(password)) return 'Password must contain a lowercase letter';
+    if (!/[0-9]/.test(password)) return 'Password must contain a number';
+    return '';
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (changePasswordForm.newPassword === changePasswordForm.confirmPassword) {
-      console.log("Password changed successfully");
-      setChangePasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
-      // In real app, send to backend
-    } else {
-      alert("New passwords don't match!");
+    setPasswordErrors({});
+    setPasswordSuccess(null);
+
+    const errors: { [key: string]: string } = {};
+
+    // Validate current password is provided
+    if (!changePasswordForm.currentPassword.trim()) {
+      errors.currentPassword = 'Current password is required';
+    }
+
+    // Validate new password constraints
+    const newPasswordError = validatePassword(changePasswordForm.newPassword);
+    if (newPasswordError) {
+      errors.newPassword = newPasswordError;
+    }
+
+    // Check if passwords match
+    if (changePasswordForm.newPassword !== changePasswordForm.confirmPassword) {
+      errors.confirmPassword = 'New passwords do not match';
+    }
+
+    // If there are validation errors, set them and return
+    if (Object.keys(errors).length > 0) {
+      setPasswordErrors(errors);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const staffUsername = localStorage.getItem('staffUsername');
+      if (!staffUsername) {
+        setPasswordErrors({ currentPassword: 'You must be logged in to change your password' });
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/auth/staff/change-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: staffUsername,
+          currentPassword: changePasswordForm.currentPassword,
+          newPassword: changePasswordForm.newPassword,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        // Success - clear form and show success message
+        setChangePasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+        setPasswordSuccess('Password changed successfully!');
+        setPasswordErrors({});
+        
+        // Clear success message after 5 seconds
+        setTimeout(() => {
+          setPasswordSuccess(null);
+        }, 5000);
+      } else {
+        // Error from backend
+        const errorMessage = data.error || 'Failed to change password';
+        if (errorMessage.toLowerCase().includes('current password')) {
+          setPasswordErrors({ currentPassword: errorMessage });
+        } else {
+          setPasswordErrors({ newPassword: errorMessage });
+        }
+      }
+    } catch (err: any) {
+      console.error('Change password error:', err);
+      setPasswordErrors({ currentPassword: 'Failed to change password. Please try again.' });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -920,52 +998,100 @@ export default function StaffDashboard({ onBack }: StaffDashboardProps) {
                 <Card className="bg-card/80 backdrop-blur-sm border-white/10">
                   <div className="p-6">
                     <h3 className="text-lg font-medium mb-4">Change Password</h3>
+                    {passwordSuccess && (
+                      <div className="p-3 rounded-md bg-green-500/10 border border-green-500/20 text-green-400 text-sm mb-4">
+                        ✓ {passwordSuccess}
+                      </div>
+                    )}
                     <form onSubmit={handleChangePassword} className="space-y-4 max-w-md">
                       <div>
-                        <Label htmlFor="currentPassword">Current Password</Label>
+                        <Label htmlFor="currentPassword">Current Password *</Label>
                         <Input
                           id="currentPassword"
                           type="password"
                           value={changePasswordForm.currentPassword}
-                          onChange={(e) => setChangePasswordForm({ 
-                            ...changePasswordForm, 
-                            currentPassword: e.target.value 
-                          })}
-                          className="bg-background/50 border-white/20"
+                          onChange={(e) => {
+                            setChangePasswordForm({ 
+                              ...changePasswordForm, 
+                              currentPassword: e.target.value 
+                            });
+                            if (passwordErrors.currentPassword) {
+                              setPasswordErrors({ ...passwordErrors, currentPassword: '' });
+                            }
+                          }}
+                          className={`bg-background/50 border-white/20 ${passwordErrors.currentPassword ? 'border-red-500' : ''}`}
                           required
+                          disabled={loading}
                         />
+                        {passwordErrors.currentPassword && (
+                          <p className="text-xs text-red-400 mt-1">{passwordErrors.currentPassword}</p>
+                        )}
                       </div>
                       <div>
-                        <Label htmlFor="newPassword">New Password</Label>
+                        <Label htmlFor="newPassword">New Password *</Label>
                         <Input
                           id="newPassword"
                           type="password"
                           value={changePasswordForm.newPassword}
-                          onChange={(e) => setChangePasswordForm({ 
-                            ...changePasswordForm, 
-                            newPassword: e.target.value 
-                          })}
-                          className="bg-background/50 border-white/20"
+                          onChange={(e) => {
+                            setChangePasswordForm({ 
+                              ...changePasswordForm, 
+                              newPassword: e.target.value 
+                            });
+                            if (passwordErrors.newPassword) {
+                              setPasswordErrors({ ...passwordErrors, newPassword: '' });
+                            }
+                            // Clear confirm password error if passwords now match
+                            if (passwordErrors.confirmPassword && e.target.value === changePasswordForm.confirmPassword) {
+                              setPasswordErrors({ ...passwordErrors, confirmPassword: '' });
+                            }
+                          }}
+                          className={`bg-background/50 border-white/20 ${passwordErrors.newPassword ? 'border-red-500' : ''}`}
                           required
+                          disabled={loading}
                         />
+                        {passwordErrors.newPassword && (
+                          <p className="text-xs text-red-400 mt-1">{passwordErrors.newPassword}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Password must be at least 6 characters with uppercase, lowercase, and a number
+                        </p>
                       </div>
                       <div>
-                        <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                        <Label htmlFor="confirmPassword">Confirm New Password *</Label>
                         <Input
                           id="confirmPassword"
                           type="password"
                           value={changePasswordForm.confirmPassword}
-                          onChange={(e) => setChangePasswordForm({ 
-                            ...changePasswordForm, 
-                            confirmPassword: e.target.value 
-                          })}
-                          className="bg-background/50 border-white/20"
+                          onChange={(e) => {
+                            setChangePasswordForm({ 
+                              ...changePasswordForm, 
+                              confirmPassword: e.target.value 
+                            });
+                            if (passwordErrors.confirmPassword) {
+                              setPasswordErrors({ ...passwordErrors, confirmPassword: '' });
+                            }
+                          }}
+                          className={`bg-background/50 border-white/20 ${passwordErrors.confirmPassword ? 'border-red-500' : ''}`}
                           required
+                          disabled={loading}
                         />
+                        {passwordErrors.confirmPassword && (
+                          <p className="text-xs text-red-400 mt-1">{passwordErrors.confirmPassword}</p>
+                        )}
+                        {changePasswordForm.confirmPassword && 
+                         changePasswordForm.newPassword === changePasswordForm.confirmPassword && 
+                         !passwordErrors.confirmPassword && (
+                          <p className="text-xs text-green-400 mt-1">✓ Passwords match</p>
+                        )}
                       </div>
-                      <Button type="submit" className="bg-primary hover:bg-primary/90">
+                      <Button 
+                        type="submit" 
+                        className="bg-primary hover:bg-primary/90"
+                        disabled={loading}
+                      >
                         <Key className="h-4 w-4 mr-2" />
-                        Change Password
+                        {loading ? 'Changing Password...' : 'Change Password'}
                       </Button>
                     </form>
                   </div>

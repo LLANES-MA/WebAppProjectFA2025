@@ -4,7 +4,7 @@
  */
 
 import { Router } from 'express';
-import { RestaurantController } from '../controllers/RestaurantController';
+import { RestaurantController, upload } from '../controllers/RestaurantController';
 import { AdminController } from '../controllers/AdminController';
 import { NotificationController } from '../controllers/NotificationController';
 import { authController } from '../controllers/AuthController';
@@ -22,12 +22,40 @@ const notificationController = new NotificationController();
 
 // Restaurant routes
 router.post('/restaurants/register', (req, res) => restaurantController.register(req, res));
+router.post('/restaurants/upload-image', (req, res, next) => {
+  upload.single('image')(req, res, (err) => {
+    if (err) {
+      // Handle multer errors
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({
+          success: false,
+          error: 'File size too large. Maximum size is 5MB.',
+        });
+      }
+      if (err.code === 'LIMIT_FILE_TYPE' || err.message.includes('Only image files')) {
+        return res.status(400).json({
+          success: false,
+          error: 'Only image files are allowed',
+        });
+      }
+      return res.status(400).json({
+        success: false,
+        error: err.message || 'Failed to upload image',
+      });
+    }
+    // If no error, proceed to controller
+    restaurantController.uploadImage(req, res).catch(next);
+  });
+});
 router.get('/restaurants', (req, res) => restaurantController.getAll(req, res));
 router.get('/restaurants/:id', (req, res) => restaurantController.getById(req, res));
 router.put('/restaurants/:id', (req, res) => restaurantController.update(req, res));
 router.get('/restaurants/:id/hours', (req, res) => restaurantController.getHours(req, res));
 router.put('/restaurants/:id/hours', (req, res) => restaurantController.updateHours(req, res));
 router.get('/restaurants/:id/menu', (req, res) => restaurantController.getMenu(req, res));
+router.post('/restaurants/:id/menu', (req, res) => restaurantController.createMenuItem(req, res));
+router.put('/restaurants/:id/menu/:itemId', (req, res) => restaurantController.updateMenuItem(req, res));
+router.patch('/restaurants/:id/menu/:itemId/availability', (req, res) => restaurantController.toggleMenuItemAvailability(req, res));
 router.post('/restaurants/:id/withdraw', (req, res) => restaurantController.requestWithdrawal(req, res));
 
 // Admin routes
@@ -46,6 +74,9 @@ router.post('/notifications/email', (req, res) => notificationController.sendEma
 router.post('/auth/restaurant/login', (req, res) => authController.restaurantLogin(req, res));
 router.post('/auth/admin/login', (req, res) => authController.adminLogin(req, res));
 router.post('/auth/staff/login', (req, res) => authController.staffLogin(req, res));
+router.post('/auth/staff/change-password', (req, res) => authController.staffChangePassword(req, res));
+router.post('/auth/admin/change-password', (req, res) => authController.adminChangePassword(req, res));
+router.post('/auth/restaurant/change-password', (req, res) => authController.restaurantChangePassword(req, res));
 router.post('/auth/driver/login', (req, res) => authController.driverLogin(req, res));
 
 // Staff routes

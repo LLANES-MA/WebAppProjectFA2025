@@ -37,6 +37,7 @@ export interface RestaurantRegistrationData {
     description: string;
     price: string;
     category: string;
+    imageUrl?: string;
   }>;
 }
 
@@ -124,6 +125,7 @@ export class RestaurantService {
                 description: item.description || '',
                 price: parseFloat(item.price) || 0,
                 category: item.category || 'Other',
+                imageUrl: item.imageUrl || undefined,
                 isAvailable: true,
               };
               await db.createMenuItem(menuItemInput);
@@ -214,6 +216,27 @@ export class RestaurantService {
    */
   async getMenuItems(restaurantId: number): Promise<MenuItem[]> {
     return await db.getMenuItems(restaurantId);
+  }
+
+  /**
+   * Create a menu item for a restaurant
+   */
+  async createMenuItem(input: MenuItemCreateInput): Promise<MenuItem> {
+    return await db.createMenuItem(input);
+  }
+
+  /**
+   * Update a menu item
+   */
+  async updateMenuItem(restaurantId: number, itemId: number, updates: Partial<MenuItem>): Promise<MenuItem | null> {
+    return await db.updateMenuItem(itemId, updates);
+  }
+
+  /**
+   * Toggle menu item availability
+   */
+  async toggleMenuItemAvailability(restaurantId: number, itemId: number, isAvailable: boolean): Promise<MenuItem | null> {
+    return await db.updateMenuItem(itemId, { isAvailable });
   }
 
   /**

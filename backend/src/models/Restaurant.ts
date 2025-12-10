@@ -26,6 +26,9 @@ export interface Restaurant {
   minimumOrder: number;
   preparationTime: number;
   
+  // Media
+  pictureUrl?: string;
+  
   // Status
   status: 'pending' | 'approved' | 'rejected' | 'inactive';
   

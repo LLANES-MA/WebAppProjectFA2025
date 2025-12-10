@@ -54,22 +54,28 @@ export default function RestaurantMenu({ restaurant, onBack, onViewCart, onResta
     fetchMenu();
   }, [restaurant?.id]);
 
-  // Group menu items by category
-  const menuCategories = menuItems.reduce((acc: any[], item: any) => {
-    const categoryName = item.category || 'Other';
-    let category = acc.find(cat => cat.name === categoryName);
-    if (!category) {
-      category = { name: categoryName, items: [] };
-      acc.push(category);
-    }
-    category.items.push({
-      ...item,
-      image: item.imageUrl || `https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&h=300&fit=crop`,
-    });
-    return acc;
-  }, []);
+  // Group menu items by category (show all items, including unavailable)
+  const menuCategories = menuItems
+    .reduce((acc: any[], item: any) => {
+      const categoryName = item.category || 'Other';
+      let category = acc.find(cat => cat.name === categoryName);
+      if (!category) {
+        category = { name: categoryName, items: [] };
+        acc.push(category);
+      }
+      category.items.push({
+        ...item,
+        image: item.imageUrl || `https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&h=300&fit=crop`,
+      });
+      return acc;
+    }, []);
 
   const addToCart = (item: any) => {
+    // Prevent adding unavailable items to cart
+    if (item.isAvailable === false) {
+      return;
+    }
+    
     const existingItem = cartItems.find(cartItem => cartItem.id === item.id);
     if (existingItem) {
       const updatedCart = cartItems.map(cartItem =>
@@ -360,65 +366,97 @@ export default function RestaurantMenu({ restaurant, onBack, onViewCart, onResta
                 {category.name}
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {category.items.map((item) => (
-                  <Card
-                    key={item.id}
-                    className="group bg-card/40 backdrop-blur-sm border-white/10 hover:border-primary/30 transition-all duration-300"
-                  >
-                    <div className="aspect-video bg-gradient-to-br from-muted/20 to-muted/5 relative overflow-hidden">
-                      <ImageWithFallback
-                        src={item.image}
-                        alt={item.name}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                      />
-                    </div>
-                    
-                    <CardContent className="p-4">
-                      <div className="space-y-3">
-                        <div>
-                          <h3 className="font-semibold text-foreground">{item.name}</h3>
-                          <p className="text-sm text-muted-foreground mt-1">{item.description}</p>
-                        </div>
-                        
-                        <div className="flex items-center justify-between">
-                          <span className="text-lg font-semibold text-primary">${item.price}</span>
+                {category.items.map((item) => {
+                  const isUnavailable = item.isAvailable === false;
+                  return (
+                    <Card
+                      key={item.id}
+                      className={`group bg-card/40 backdrop-blur-sm border-white/10 transition-all duration-300 ${
+                        isUnavailable 
+                          ? 'opacity-50 grayscale' 
+                          : 'hover:border-primary/30'
+                      }`}
+                    >
+                      <div className="aspect-video bg-gradient-to-br from-muted/20 to-muted/5 relative overflow-hidden">
+                        <ImageWithFallback
+                          src={item.image}
+                          alt={item.name}
+                          className={`w-full h-full object-cover transition-transform duration-300 ${
+                            isUnavailable 
+                              ? '' 
+                              : 'group-hover:scale-110'
+                          }`}
+                        />
+                        {isUnavailable && (
+                          <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                            <Badge variant="secondary" className="bg-muted/80 text-muted-foreground">
+                              Unavailable
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <CardContent className="p-4">
+                        <div className="space-y-3">
+                          <div>
+                            <h3 className={`font-semibold ${isUnavailable ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+                              {item.name}
+                            </h3>
+                            <p className={`text-sm mt-1 ${isUnavailable ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
+                              {item.description}
+                            </p>
+                          </div>
                           
-                          {quantities[item.id] > 0 ? (
-                            <div className="flex items-center space-x-2">
+                          <div className="flex items-center justify-between">
+                            <span className={`text-lg font-semibold ${isUnavailable ? 'text-muted-foreground' : 'text-primary'}`}>
+                              ${item.price}
+                            </span>
+                            
+                            {isUnavailable ? (
                               <Button
                                 size="sm"
-                                variant="outline"
-                                onClick={() => removeFromCart(item)}
-                                className="h-8 w-8 p-0"
+                                disabled
+                                className="bg-muted text-muted-foreground cursor-not-allowed"
                               >
-                                <Minus className="h-3 w-3" />
+                                Unavailable
                               </Button>
-                              <span className="font-semibold text-foreground w-8 text-center">
-                                {quantities[item.id]}
-                              </span>
+                            ) : quantities[item.id] > 0 ? (
+                              <div className="flex items-center space-x-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => removeFromCart(item)}
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <Minus className="h-3 w-3" />
+                                </Button>
+                                <span className="font-semibold text-foreground w-8 text-center">
+                                  {quantities[item.id]}
+                                </span>
+                                <Button
+                                  size="sm"
+                                  onClick={() => addToCart(item)}
+                                  className="h-8 w-8 p-0 bg-primary hover:bg-primary/90"
+                                >
+                                  <Plus className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ) : (
                               <Button
                                 size="sm"
                                 onClick={() => addToCart(item)}
-                                className="h-8 w-8 p-0 bg-primary hover:bg-primary/90"
+                                className="bg-primary hover:bg-primary/90 text-primary-foreground"
                               >
-                                <Plus className="h-3 w-3" />
+                                <Plus className="h-4 w-4 mr-1" />
+                                Add
                               </Button>
-                            </div>
-                          ) : (
-                            <Button
-                              size="sm"
-                              onClick={() => addToCart(item)}
-                              className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                            >
-                              <Plus className="h-4 w-4 mr-1" />
-                              Add
-                            </Button>
-                          )}
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             </div>
           ))}

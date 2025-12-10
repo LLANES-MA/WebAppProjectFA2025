@@ -22,7 +22,12 @@ import {
   MoreHorizontal,
   CheckCircle,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  Mail,
+  Phone,
+  MapPin,
+  ArrowLeft,
+  Upload
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from './ui/dialog';
@@ -34,9 +39,11 @@ import { Separator } from './ui/separator';
 interface RestaurantDashboardProps {
   onBack: () => void;
   restaurantId?: number; // Optional restaurant ID prop
+  restaurantStatus?: string; // Restaurant approval status
+  restaurantName?: string; // Restaurant name for approval modal
 }
 
-export default function RestaurantDashboard({ onBack, restaurantId }: RestaurantDashboardProps) {
+export default function RestaurantDashboard({ onBack, restaurantId, restaurantStatus, restaurantName }: RestaurantDashboardProps) {
   const [activeTab, setActiveTab] = useState('overview');
   const [isLeaveDialogOpen, setIsLeaveDialogOpen] = useState(false);
   const [restaurant, setRestaurant] = useState<any>(null);
@@ -46,6 +53,22 @@ export default function RestaurantDashboard({ onBack, restaurantId }: Restaurant
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [isPendingApproval, setIsPendingApproval] = useState(false);
+  const [showAddMenuItemModal, setShowAddMenuItemModal] = useState(false);
+  const [showEditMenuItemModal, setShowEditMenuItemModal] = useState(false);
+  const [editingMenuItem, setEditingMenuItem] = useState<any>(null);
+  const [savingMenuItem, setSavingMenuItem] = useState(false);
+  const [updatingAvailability, setUpdatingAvailability] = useState<number | null>(null);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [changePasswordForm, setChangePasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [passwordErrors, setPasswordErrors] = useState<{ [key: string]: string }>({});
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
+  const [changingPassword, setChangingPassword] = useState(false);
   
   // Form state for settings
   const [formData, setFormData] = useState({
@@ -55,6 +78,31 @@ export default function RestaurantDashboard({ onBack, restaurantId }: Restaurant
     deliveryFee: '',
     minimumOrder: '',
     preparationTime: '',
+    pictureUrl: '',
+    imageFile: null as File | null,
+    imagePreview: null as string | null,
+  });
+
+  // Form state for new menu item
+  const [newMenuItem, setNewMenuItem] = useState({
+    name: '',
+    description: '',
+    price: '',
+    isAvailable: true,
+    pictureUrl: '',
+    imageFile: null as File | null,
+    imagePreview: null as string | null,
+  });
+
+  // Form state for editing menu item
+  const [editMenuItem, setEditMenuItem] = useState({
+    name: '',
+    description: '',
+    price: '',
+    isAvailable: true,
+    pictureUrl: '',
+    imageFile: null as File | null,
+    imagePreview: null as string | null,
   });
   
   // Get restaurant ID from localStorage (set during login) or prop
@@ -97,12 +145,32 @@ export default function RestaurantDashboard({ onBack, restaurantId }: Restaurant
         setLoading(true);
         const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
         
-        // Fetch restaurant data
+        // Fetch restaurant data (always fetch to show info even if pending)
         const restaurantResponse = await fetch(`${API_BASE_URL}/restaurants/${currentRestaurantId}`);
         if (!restaurantResponse.ok) throw new Error('Failed to fetch restaurant');
         const restaurantData = await restaurantResponse.json();
         const restaurantInfo = restaurantData.restaurant;
         setRestaurant(restaurantInfo);
+        
+        // Check approval status (from props or fetched data)
+        const status = (restaurantStatus || restaurantInfo?.status || 'pending').toLowerCase();
+        
+        if (status !== 'approved') {
+          // Show pending approval page
+          setIsPendingApproval(true);
+          setLoading(false);
+          return;
+        }
+        
+        // Restaurant is approved - check if first login
+        const firstLoginKey = `restaurant_${currentRestaurantId}_first_login`;
+        const hasLoggedInBefore = localStorage.getItem(firstLoginKey);
+        
+        if (!hasLoggedInBefore) {
+          // Mark as logged in and show approval modal
+          localStorage.setItem(firstLoginKey, 'true');
+          setShowApprovalModal(true);
+        }
         
         // Initialize form data
         setFormData({
@@ -112,6 +180,9 @@ export default function RestaurantDashboard({ onBack, restaurantId }: Restaurant
           deliveryFee: restaurantInfo?.deliveryFee?.toString() || '0',
           minimumOrder: restaurantInfo?.minimumOrder?.toString() || '0',
           preparationTime: restaurantInfo?.preparationTime?.toString() || '30',
+          pictureUrl: restaurantInfo?.pictureUrl || '',
+          imageFile: null,
+          imagePreview: restaurantInfo?.pictureUrl || null,
         });
 
         // Fetch all orders for this restaurant (for stats)
@@ -186,6 +257,295 @@ export default function RestaurantDashboard({ onBack, restaurantId }: Restaurant
       fetchRestaurantData();
     }
   }, [currentRestaurantId]);
+
+  // Handle image upload for menu item
+  const handleMenuItemImageUpload = async (file: File | null) => {
+    if (!file) {
+      setNewMenuItem(prev => ({ ...prev, imageFile: null, imagePreview: null, pictureUrl: '' }));
+      return;
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select a valid image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image size must be less than 5MB');
+      return;
+    }
+
+    // Create preview URL for immediate display
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setNewMenuItem(prev => ({ ...prev, imagePreview: reader.result as string, imageFile: file }));
+    };
+    reader.readAsDataURL(file);
+
+    // Upload image to backend and get URL
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const response = await fetch(`${API_BASE_URL}/restaurants/upload-image`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to upload image');
+      }
+
+      // Update menu item with the image URL from backend
+      setNewMenuItem(prev => ({ ...prev, pictureUrl: data.imageUrl }));
+    } catch (error: any) {
+      console.error('Error uploading image:', error);
+      alert('Failed to upload image. Please try again.');
+      setNewMenuItem(prev => ({ ...prev, imageFile: null, imagePreview: null }));
+    }
+  };
+
+  // Handle save new menu item
+  const handleSaveMenuItem = async () => {
+    if (!currentRestaurantId) {
+      alert('Restaurant ID not found');
+      return;
+    }
+
+    if (!newMenuItem.name || !newMenuItem.price) {
+      alert('Please fill in all required fields (name and price)');
+      return;
+    }
+
+    try {
+      setSavingMenuItem(true);
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+
+      const response = await fetch(`${API_BASE_URL}/restaurants/${currentRestaurantId}/menu`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: newMenuItem.name,
+          description: newMenuItem.description || '',
+          price: parseFloat(newMenuItem.price),
+          isAvailable: newMenuItem.isAvailable,
+          pictureUrl: newMenuItem.pictureUrl || undefined,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to create menu item');
+      }
+
+      // Refresh menu items
+      const menuResponse = await fetch(`${API_BASE_URL}/restaurants/${currentRestaurantId}/menu`);
+      if (menuResponse.ok) {
+        const menuData = await menuResponse.json();
+        setMenuItems(menuData.menuItems || []);
+      }
+
+      // Reset form and close modal
+      setNewMenuItem({
+        name: '',
+        description: '',
+        price: '',
+        isAvailable: true,
+        pictureUrl: '',
+        imageFile: null,
+        imagePreview: null,
+      });
+      setShowAddMenuItemModal(false);
+      alert('Menu item created successfully!');
+    } catch (error: any) {
+      console.error('Error creating menu item:', error);
+      alert('Failed to create menu item: ' + error.message);
+    } finally {
+      setSavingMenuItem(false);
+    }
+  };
+
+  // Handle edit menu item
+  const handleEditMenuItem = (item: any) => {
+    setEditingMenuItem(item);
+    setEditMenuItem({
+      name: item.name || '',
+      description: item.description || '',
+      price: item.price?.toString() || '',
+      isAvailable: item.isAvailable !== false,
+      pictureUrl: item.imageUrl || '',
+      imageFile: null,
+      imagePreview: item.imageUrl || null,
+    });
+    setShowEditMenuItemModal(true);
+  };
+
+  // Handle image upload for edit menu item
+  const handleEditMenuItemImageUpload = async (file: File | null) => {
+    if (!file) {
+      setEditMenuItem(prev => ({ ...prev, imageFile: null, imagePreview: null, pictureUrl: '' }));
+      return;
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select a valid image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image size must be less than 5MB');
+      return;
+    }
+
+    // Create preview URL for immediate display
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setEditMenuItem(prev => ({ ...prev, imagePreview: reader.result as string, imageFile: file }));
+    };
+    reader.readAsDataURL(file);
+
+    // Upload image to backend and get URL
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const response = await fetch(`${API_BASE_URL}/restaurants/upload-image`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to upload image');
+      }
+
+      // Update menu item with the image URL from backend
+      setEditMenuItem(prev => ({ ...prev, pictureUrl: data.imageUrl }));
+    } catch (error: any) {
+      console.error('Error uploading image:', error);
+      alert('Failed to upload image. Please try again.');
+      setEditMenuItem(prev => ({ ...prev, imageFile: null, imagePreview: null }));
+    }
+  };
+
+  // Handle save edited menu item
+  const handleSaveEditMenuItem = async () => {
+    if (!currentRestaurantId || !editingMenuItem) {
+      alert('Restaurant ID or menu item not found');
+      return;
+    }
+
+    if (!editMenuItem.name || !editMenuItem.price) {
+      alert('Please fill in all required fields (name and price)');
+      return;
+    }
+
+    try {
+      setSavingMenuItem(true);
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+
+      const response = await fetch(`${API_BASE_URL}/restaurants/${currentRestaurantId}/menu/${editingMenuItem.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: editMenuItem.name,
+          description: editMenuItem.description || '',
+          price: parseFloat(editMenuItem.price),
+          isAvailable: editMenuItem.isAvailable,
+          pictureUrl: editMenuItem.pictureUrl || undefined,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to update menu item');
+      }
+
+      // Refresh menu items
+      const menuResponse = await fetch(`${API_BASE_URL}/restaurants/${currentRestaurantId}/menu`);
+      if (menuResponse.ok) {
+        const menuData = await menuResponse.json();
+        setMenuItems(menuData.menuItems || []);
+      }
+
+      // Reset form and close modal
+      setEditMenuItem({
+        name: '',
+        description: '',
+        price: '',
+        isAvailable: true,
+        pictureUrl: '',
+        imageFile: null,
+        imagePreview: null,
+      });
+      setEditingMenuItem(null);
+      setShowEditMenuItemModal(false);
+      alert('Menu item updated successfully!');
+    } catch (error: any) {
+      console.error('Error updating menu item:', error);
+      alert('Failed to update menu item: ' + error.message);
+    } finally {
+      setSavingMenuItem(false);
+    }
+  };
+
+  // Handle toggle availability
+  const handleToggleAvailability = async (item: any) => {
+    if (!currentRestaurantId) {
+      alert('Restaurant ID not found');
+      return;
+    }
+
+    const newAvailability = !(item.isAvailable !== false);
+    setUpdatingAvailability(item.id);
+
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+
+      const response = await fetch(`${API_BASE_URL}/restaurants/${currentRestaurantId}/menu/${item.id}/availability`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          isAvailable: newAvailability,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to update availability');
+      }
+
+      // Refresh menu items
+      const menuResponse = await fetch(`${API_BASE_URL}/restaurants/${currentRestaurantId}/menu`);
+      if (menuResponse.ok) {
+        const menuData = await menuResponse.json();
+        setMenuItems(menuData.menuItems || []);
+      }
+    } catch (error: any) {
+      console.error('Error toggling availability:', error);
+      alert('Failed to update availability: ' + error.message);
+    } finally {
+      setUpdatingAvailability(null);
+    }
+  };
 
   // Calculate stats from orders using useMemo to recalculate when allOrders changes
   const stats = useMemo(() => {
@@ -302,6 +662,58 @@ export default function RestaurantDashboard({ onBack, restaurantId }: Restaurant
     }));
   };
 
+  // Handle restaurant picture upload
+  const handleRestaurantImageUpload = async (file: File | null) => {
+    if (!file) {
+      setFormData(prev => ({ ...prev, imageFile: null, imagePreview: null, pictureUrl: '' }));
+      return;
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select a valid image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image size must be less than 5MB');
+      return;
+    }
+
+    // Create preview URL for immediate display
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setFormData(prev => ({ ...prev, imagePreview: reader.result as string, imageFile: file }));
+    };
+    reader.readAsDataURL(file);
+
+    // Upload image to backend and get URL
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+      const formDataUpload = new FormData();
+      formDataUpload.append('image', file);
+
+      const response = await fetch(`${API_BASE_URL}/restaurants/upload-image`, {
+        method: 'POST',
+        body: formDataUpload,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to upload image');
+      }
+
+      // Update form data with the image URL from backend
+      setFormData(prev => ({ ...prev, pictureUrl: data.imageUrl }));
+    } catch (error: any) {
+      console.error('Error uploading image:', error);
+      alert('Failed to upload image. Please try again.');
+      setFormData(prev => ({ ...prev, imageFile: null, imagePreview: null }));
+    }
+  };
+
   const handleSaveChanges = async () => {
     if (!currentRestaurantId) {
       setError('Restaurant ID not found');
@@ -312,10 +724,15 @@ export default function RestaurantDashboard({ onBack, restaurantId }: Restaurant
       setSaving(true);
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
 
-      // Update restaurant information
+      // Update restaurant information with all fields
       const restaurantUpdates: any = {
         restaurantName: formData.restaurantName,
         phone: formData.phone,
+        description: formData.description || '',
+        deliveryFee: formData.deliveryFee ? parseFloat(formData.deliveryFee) : undefined,
+        minimumOrder: formData.minimumOrder ? parseFloat(formData.minimumOrder) : undefined,
+        preparationTime: formData.preparationTime ? parseInt(formData.preparationTime) : undefined,
+        pictureUrl: formData.pictureUrl || undefined,
       };
 
       const updateResponse = await fetch(`${API_BASE_URL}/restaurants/${currentRestaurantId}`, {
@@ -327,7 +744,8 @@ export default function RestaurantDashboard({ onBack, restaurantId }: Restaurant
       });
 
       if (!updateResponse.ok) {
-        throw new Error('Failed to update restaurant information');
+        const errorData = await updateResponse.json();
+        throw new Error(errorData.error || 'Failed to update restaurant information');
       }
 
       // Update operating hours
@@ -364,6 +782,9 @@ export default function RestaurantDashboard({ onBack, restaurantId }: Restaurant
           deliveryFee: restaurantData.restaurant?.deliveryFee?.toString() || '0',
           minimumOrder: restaurantData.restaurant?.minimumOrder?.toString() || '0',
           preparationTime: restaurantData.restaurant?.preparationTime?.toString() || '30',
+          pictureUrl: restaurantData.restaurant?.pictureUrl || '',
+          imageFile: null,
+          imagePreview: restaurantData.restaurant?.pictureUrl || null,
         });
       }
 
@@ -432,6 +853,124 @@ export default function RestaurantDashboard({ onBack, restaurantId }: Restaurant
             <Button onClick={onBack}>Go Back</Button>
           </CardContent>
         </Card>
+      </div>
+    );
+  }
+
+  // Show pending approval page if restaurant is not approved
+  if (isPendingApproval) {
+    return (
+      <div className="min-h-screen bg-background frontdash-animated-bg">
+        <header className="border-b border-white/10 bg-background/80 backdrop-blur-md">
+          <div className="container mx-auto px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <h1 className="text-xl font-bold text-primary">FrontDash</h1>
+                <div className="w-4 h-4 border border-primary rounded-full flex items-center justify-center">
+                  <div className="w-1.5 h-1.5 bg-primary rounded-full"></div>
+                </div>
+                <span className="text-muted-foreground">|</span>
+                <span className="text-foreground">Restaurant Dashboard</span>
+              </div>
+              <Button variant="ghost" onClick={onBack}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Sign Out
+              </Button>
+            </div>
+          </div>
+        </header>
+
+        <div className="container mx-auto px-6 py-12">
+          <div className="max-w-2xl mx-auto space-y-8">
+            <Card className="frontdash-card-bg frontdash-border-glow">
+              <CardHeader className="text-center">
+                <div className="w-16 h-16 bg-yellow-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Clock className="h-8 w-8 text-yellow-500" />
+                </div>
+                <CardTitle className="text-2xl">Registration Pending Approval</CardTitle>
+                <Badge variant="secondary" className="w-fit mx-auto mt-2">
+                  <Clock className="h-3 w-3 mr-1" />
+                  Pending Review
+                </Badge>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="text-center space-y-2">
+                  <p className="text-muted-foreground">
+                    Your restaurant registration is currently under review by our admin team.
+                  </p>
+                  {restaurant && (
+                    <p className="text-foreground font-medium">
+                      {restaurant.restaurantName || restaurantName || 'Your Restaurant'}
+                    </p>
+                  )}
+                </div>
+
+                <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
+                  <h4 className="font-medium text-primary mb-3">What happens next?</h4>
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-6 h-6 bg-primary/20 rounded-full flex items-center justify-center mt-0.5">
+                        <span className="text-xs font-medium text-primary">1</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Review Process</p>
+                        <p className="text-xs text-muted-foreground">
+                          Our team will review your restaurant information, business documents, and menu details.
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-start gap-3">
+                      <div className="w-6 h-6 bg-primary/20 rounded-full flex items-center justify-center mt-0.5">
+                        <span className="text-xs font-medium text-primary">2</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Verification</p>
+                        <p className="text-xs text-muted-foreground">
+                          We'll verify your business license, tax information, and contact details.
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-start gap-3">
+                      <div className="w-6 h-6 bg-primary/20 rounded-full flex items-center justify-center mt-0.5">
+                        <span className="text-xs font-medium text-primary">3</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Approval & Access</p>
+                        <p className="text-xs text-muted-foreground">
+                          Once approved, you'll receive full access to your restaurant dashboard and can start accepting orders.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
+                  <h4 className="font-medium text-green-400 mb-2">Expected Timeline</h4>
+                  <p className="text-sm text-green-300">
+                    Most restaurant applications are reviewed within <span className="font-medium">2-3 business days</span>. 
+                    Complex applications may take up to 5 business days for thorough review.
+                  </p>
+                </div>
+
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                  <h4 className="font-medium text-blue-400 mb-3">Need Help?</h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center gap-2 text-blue-300">
+                      <Mail className="h-4 w-4" />
+                      <span>support@frontdash.com</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-blue-300">
+                      <Phone className="h-4 w-4" />
+                      <span>1-800-FRONTDASH</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     );
   }
@@ -746,66 +1285,104 @@ export default function RestaurantDashboard({ onBack, restaurantId }: Restaurant
                 <h3 className="text-lg font-medium text-foreground">Menu Management</h3>
                 <p className="text-muted-foreground">Add, edit, and manage your menu items</p>
               </div>
-              <Button className="bg-primary hover:bg-primary/80">
+              <Button 
+                className="bg-primary hover:bg-primary/80"
+                onClick={() => setShowAddMenuItemModal(true)}
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Menu Item
               </Button>
             </div>
 
             <div className="grid gap-4">
-              {menuItems.map((item) => (
-                <Card key={item.id} className="bg-card/60 backdrop-blur-sm border-white/10">
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-16 h-16 bg-muted/20 rounded-lg"></div>
-                        <div>
-                          <div className="flex items-center space-x-2">
-                            <h4 className="font-medium text-foreground">{item.name}</h4>
-                            {item.popular && <Badge className="bg-yellow-500/20 text-yellow-500">Popular</Badge>}
+              {menuItems.map((item) => {
+                const isUnavailable = item.isAvailable === false;
+                return (
+                  <Card 
+                    key={item.id} 
+                    className={`bg-card/60 backdrop-blur-sm border-white/10 ${isUnavailable ? 'opacity-50' : ''}`}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <div className="w-16 h-16 bg-muted/20 rounded-lg overflow-hidden">
+                            {item.imageUrl ? (
+                              <img
+                                src={item.imageUrl}
+                                alt={item.name}
+                                className={`w-full h-full object-cover ${isUnavailable ? 'grayscale' : ''}`}
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
+                                No Image
+                              </div>
+                            )}
                           </div>
-                          <p className="text-sm text-muted-foreground mb-1">{item.description}</p>
-                          <p className="text-sm text-muted-foreground">Category: {item.category}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center space-x-4">
-                        <div className="text-right">
-                          <p className="text-lg font-medium text-foreground">${item.price}</p>
-                          <div className="flex items-center space-x-2">
-                            <Switch checked={item.isAvailable !== false} />
-                            <span className="text-xs text-muted-foreground">
-                              {item.isAvailable !== false ? 'Available' : 'Unavailable'}
-                            </span>
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <h4 className={`font-medium ${isUnavailable ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+                                {item.name}
+                              </h4>
+                              {item.popular && <Badge className="bg-yellow-500/20 text-yellow-500">Popular</Badge>}
+                            </div>
+                            <p className={`text-sm mb-1 ${isUnavailable ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
+                              {item.description}
+                            </p>
+                            <p className={`text-sm ${isUnavailable ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
+                              Category: {item.category}
+                            </p>
                           </div>
                         </div>
                         
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent>
-                            <DropdownMenuItem>
-                              <Edit className="h-4 w-4 mr-2" />
-                              Edit Item
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive">
-                              <XCircle className="h-4 w-4 mr-2" />
-                              Remove Item
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <div className="flex items-center space-x-4">
+                          <div className="text-right">
+                            <p className={`text-lg font-medium ${isUnavailable ? 'text-muted-foreground' : 'text-foreground'}`}>
+                              ${item.price}
+                            </p>
+                            <div className="flex items-center space-x-2">
+                              <Switch 
+                                checked={item.isAvailable !== false} 
+                                onCheckedChange={() => handleToggleAvailability(item)}
+                                disabled={updatingAvailability === item.id}
+                              />
+                              <span className={`text-xs ${isUnavailable ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
+                                {updatingAvailability === item.id 
+                                  ? 'Updating...' 
+                                  : item.isAvailable !== false 
+                                    ? 'Available' 
+                                    : 'Unavailable'
+                                }
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                              <DropdownMenuItem onClick={() => handleEditMenuItem(item)}>
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit Item
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="text-destructive">
+                                <XCircle className="h-4 w-4 mr-2" />
+                                Remove Item
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </TabsContent>
 
@@ -859,6 +1436,53 @@ export default function RestaurantDashboard({ onBack, restaurantId }: Restaurant
                 <p className="text-muted-foreground">Manage your restaurant information and preferences</p>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* Restaurant Picture Upload */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Restaurant Picture</label>
+                  <div className="space-y-4">
+                    {formData.imagePreview && (
+                      <div className="relative w-full h-64 bg-muted/20 rounded-lg overflow-hidden">
+                        <img
+                          src={formData.imagePreview}
+                          alt="Restaurant preview"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                    <div className="flex items-center gap-4">
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0] || null;
+                          handleRestaurantImageUpload(file);
+                        }}
+                        className="hidden"
+                        id="restaurant-image-upload"
+                      />
+                      <Label
+                        htmlFor="restaurant-image-upload"
+                        className="cursor-pointer"
+                      >
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="border-white/20"
+                          onClick={() => document.getElementById('restaurant-image-upload')?.click()}
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          {formData.imagePreview ? 'Change Picture' : 'Upload Picture'}
+                        </Button>
+                      </Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      JPG, PNG, or GIF (max 5MB)
+                    </p>
+                  </div>
+                </div>
+
+                <Separator className="bg-white/10" />
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-2">Restaurant Name</label>
@@ -884,6 +1508,7 @@ export default function RestaurantDashboard({ onBack, restaurantId }: Restaurant
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     className="bg-card/50 border-white/10"
+                    placeholder="Describe your restaurant..."
                   />
                 </div>
 
@@ -1004,13 +1629,21 @@ export default function RestaurantDashboard({ onBack, restaurantId }: Restaurant
                 </div>
 
                 <div className="flex justify-between pt-6">
-                  <Button 
-                    className="bg-primary hover:bg-primary/80"
-                    onClick={handleSaveChanges}
-                    disabled={saving}
-                  >
-                    {saving ? 'Saving...' : 'Save Changes'}
-                  </Button>
+                  <div className="flex items-center gap-4">
+                    <Button 
+                      className="bg-primary hover:bg-primary/80"
+                      onClick={handleSaveChanges}
+                      disabled={saving}
+                    >
+                      {saving ? 'Saving...' : 'Save Changes'}
+                    </Button>
+                    <Button
+                      onClick={() => setShowChangePasswordModal(true)}
+                      className="bg-primary hover:bg-primary/80"
+                    >
+                      Change Password
+                    </Button>
+                  </div>
                   
                   <Dialog open={isLeaveDialogOpen} onOpenChange={setIsLeaveDialogOpen}>
                     <DialogTrigger asChild>
@@ -1067,6 +1700,588 @@ export default function RestaurantDashboard({ onBack, restaurantId }: Restaurant
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Add Menu Item Modal */}
+      <Dialog open={showAddMenuItemModal} onOpenChange={setShowAddMenuItemModal}>
+        <DialogContent className="bg-card/95 backdrop-blur-sm border-white/20 max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl text-primary">Add New Menu Item</DialogTitle>
+            <DialogDescription className="text-base text-foreground pt-2">
+              Create a new menu item for your restaurant
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6 py-4">
+            {/* Name */}
+            <div className="space-y-2">
+              <Label htmlFor="item-name" className="text-foreground">Name *</Label>
+              <Input
+                id="item-name"
+                value={newMenuItem.name}
+                onChange={(e) => setNewMenuItem(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Enter item name"
+                className="bg-background/50 border-white/10"
+              />
+            </div>
+
+            {/* Description */}
+            <div className="space-y-2">
+              <Label htmlFor="item-description" className="text-foreground">Description</Label>
+              <Textarea
+                id="item-description"
+                value={newMenuItem.description}
+                onChange={(e) => setNewMenuItem(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Enter item description"
+                className="bg-background/50 border-white/10 min-h-[100px]"
+              />
+            </div>
+
+            {/* Price */}
+            <div className="space-y-2">
+              <Label htmlFor="item-price" className="text-foreground">Price *</Label>
+              <Input
+                id="item-price"
+                type="number"
+                step="0.01"
+                min="0"
+                value={newMenuItem.price}
+                onChange={(e) => setNewMenuItem(prev => ({ ...prev, price: e.target.value }))}
+                placeholder="0.00"
+                className="bg-background/50 border-white/10"
+              />
+            </div>
+
+            {/* Image Upload */}
+            <div className="space-y-2">
+              <Label className="text-foreground">Picture</Label>
+              <div className="space-y-4">
+                {newMenuItem.imagePreview && (
+                  <div className="relative w-full h-48 bg-muted/20 rounded-lg overflow-hidden">
+                    <img
+                      src={newMenuItem.imagePreview}
+                      alt="Preview"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+                <div className="flex items-center gap-4">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null;
+                      handleMenuItemImageUpload(file);
+                    }}
+                    className="hidden"
+                    id="menu-item-image-upload"
+                  />
+                  <Label
+                    htmlFor="menu-item-image-upload"
+                    className="cursor-pointer"
+                  >
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full border-white/20"
+                      onClick={() => document.getElementById('menu-item-image-upload')?.click()}
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      {newMenuItem.imagePreview ? 'Change Image' : 'Upload Image'}
+                    </Button>
+                  </Label>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  JPG, PNG, or GIF (max 5MB)
+                </p>
+              </div>
+            </div>
+
+            {/* Availability */}
+            <div className="flex items-center justify-between space-x-2">
+              <div className="space-y-0.5">
+                <Label htmlFor="item-available" className="text-foreground">Available</Label>
+                <p className="text-xs text-muted-foreground">
+                  Make this item available for ordering
+                </p>
+              </div>
+              <Switch
+                id="item-available"
+                checked={newMenuItem.isAvailable}
+                onCheckedChange={(checked) => setNewMenuItem(prev => ({ ...prev, isAvailable: checked }))}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowAddMenuItemModal(false);
+                setNewMenuItem({
+                  name: '',
+                  description: '',
+                  price: '',
+                  isAvailable: true,
+                  pictureUrl: '',
+                  imageFile: null,
+                  imagePreview: null,
+                });
+              }}
+              disabled={savingMenuItem}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveMenuItem}
+              disabled={savingMenuItem || !newMenuItem.name || !newMenuItem.price}
+              className="bg-primary hover:bg-primary/80"
+            >
+              {savingMenuItem ? 'Saving...' : 'Save New Item'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Menu Item Modal */}
+      <Dialog open={showEditMenuItemModal} onOpenChange={setShowEditMenuItemModal}>
+        <DialogContent className="bg-card/95 backdrop-blur-sm border-white/20 max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl text-primary">Edit Menu Item</DialogTitle>
+            <DialogDescription className="text-base text-foreground pt-2">
+              Update menu item details
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6 py-4">
+            {/* Name */}
+            <div className="space-y-2">
+              <Label htmlFor="edit-item-name" className="text-foreground">Name *</Label>
+              <Input
+                id="edit-item-name"
+                value={editMenuItem.name}
+                onChange={(e) => setEditMenuItem(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Enter item name"
+                className="bg-background/50 border-white/10"
+              />
+            </div>
+
+            {/* Description */}
+            <div className="space-y-2">
+              <Label htmlFor="edit-item-description" className="text-foreground">Description</Label>
+              <Textarea
+                id="edit-item-description"
+                value={editMenuItem.description}
+                onChange={(e) => setEditMenuItem(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Enter item description"
+                className="bg-background/50 border-white/10 min-h-[100px]"
+              />
+            </div>
+
+            {/* Price */}
+            <div className="space-y-2">
+              <Label htmlFor="edit-item-price" className="text-foreground">Price *</Label>
+              <Input
+                id="edit-item-price"
+                type="number"
+                step="0.01"
+                min="0"
+                value={editMenuItem.price}
+                onChange={(e) => setEditMenuItem(prev => ({ ...prev, price: e.target.value }))}
+                placeholder="0.00"
+                className="bg-background/50 border-white/10"
+              />
+            </div>
+
+            {/* Image Upload */}
+            <div className="space-y-2">
+              <Label className="text-foreground">Picture</Label>
+              <div className="space-y-4">
+                {editMenuItem.imagePreview && (
+                  <div className="relative w-full h-48 bg-muted/20 rounded-lg overflow-hidden">
+                    <img
+                      src={editMenuItem.imagePreview}
+                      alt="Preview"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+                <div className="flex items-center gap-4">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null;
+                      handleEditMenuItemImageUpload(file);
+                    }}
+                    className="hidden"
+                    id="edit-menu-item-image-upload"
+                  />
+                  <Label
+                    htmlFor="edit-menu-item-image-upload"
+                    className="cursor-pointer"
+                  >
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full border-white/20"
+                      onClick={() => document.getElementById('edit-menu-item-image-upload')?.click()}
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      {editMenuItem.imagePreview ? 'Change Image' : 'Upload Image'}
+                    </Button>
+                  </Label>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  JPG, PNG, or GIF (max 5MB)
+                </p>
+              </div>
+            </div>
+
+            {/* Availability */}
+            <div className="flex items-center justify-between space-x-2">
+              <div className="space-y-0.5">
+                <Label htmlFor="edit-item-available" className="text-foreground">Available</Label>
+                <p className="text-xs text-muted-foreground">
+                  Make this item available for ordering
+                </p>
+              </div>
+              <Switch
+                id="edit-item-available"
+                checked={editMenuItem.isAvailable}
+                onCheckedChange={(checked) => setEditMenuItem(prev => ({ ...prev, isAvailable: checked }))}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowEditMenuItemModal(false);
+                setEditingMenuItem(null);
+                setEditMenuItem({
+                  name: '',
+                  description: '',
+                  price: '',
+                  isAvailable: true,
+                  pictureUrl: '',
+                  imageFile: null,
+                  imagePreview: null,
+                });
+              }}
+              disabled={savingMenuItem}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveEditMenuItem}
+              disabled={savingMenuItem || !editMenuItem.name || !editMenuItem.price}
+              className="bg-primary hover:bg-primary/80"
+            >
+              {savingMenuItem ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Approval Modal - Shows on first login after approval */}
+      <Dialog open={showApprovalModal} onOpenChange={setShowApprovalModal}>
+        <DialogContent className="bg-card/95 backdrop-blur-sm border-white/20 max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center">
+                <CheckCircle className="h-6 w-6 text-green-400" />
+              </div>
+              <DialogTitle className="text-2xl text-primary">Congratulations! Your Restaurant is Approved!</DialogTitle>
+            </div>
+            <DialogDescription className="text-base text-foreground pt-2">
+              Your restaurant has been approved and is now live on FrontDash!
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6 py-4">
+            {restaurant && (
+              <div className="space-y-4">
+                {/* Restaurant Information */}
+                <Card className="frontdash-card-bg">
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Package className="h-5 w-5" />
+                      Restaurant Information
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-muted-foreground">Restaurant Name</Label>
+                        <p className="font-medium">{restaurant.restaurantName || restaurantName || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <Label className="text-muted-foreground">Cuisine Type</Label>
+                        <p className="font-medium">{restaurant.cuisineType || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <Label className="text-muted-foreground">Average Price</Label>
+                        <p className="font-medium">{restaurant.averagePrice || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <Label className="text-muted-foreground">Preparation Time</Label>
+                        <p className="font-medium">{restaurant.preparationTime || 'N/A'} min</p>
+                      </div>
+                    </div>
+                    {restaurant.description && (
+                      <div>
+                        <Label className="text-muted-foreground">Description</Label>
+                        <p className="font-medium mt-1">{restaurant.description}</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Contact Information */}
+                <Card className="frontdash-card-bg">
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Phone className="h-5 w-5" />
+                      Contact Information
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <Mail className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <Label className="text-muted-foreground text-xs">Email</Label>
+                        <p className="font-medium">{restaurant.email || 'N/A'}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Phone className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <Label className="text-muted-foreground text-xs">Phone</Label>
+                        <p className="font-medium">{restaurant.phone || 'N/A'}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <Label className="text-muted-foreground text-xs">Address</Label>
+                        <p className="font-medium">
+                          {restaurant.address ? 
+                            `${restaurant.address}, ${restaurant.city}, ${restaurant.state} ${restaurant.zipCode}` 
+                            : 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Business Details */}
+                <Card className="frontdash-card-bg">
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <DollarSign className="h-5 w-5" />
+                      Business Details
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <Label className="text-muted-foreground">Delivery Fee</Label>
+                        <p className="font-medium">${typeof restaurant.deliveryFee === 'number' ? restaurant.deliveryFee.toFixed(2) : restaurant.deliveryFee || '0.00'}</p>
+                      </div>
+                      <div>
+                        <Label className="text-muted-foreground">Minimum Order</Label>
+                        <p className="font-medium">${typeof restaurant.minimumOrder === 'number' ? restaurant.minimumOrder.toFixed(2) : restaurant.minimumOrder || '0.00'}</p>
+                      </div>
+                      <div>
+                        <Label className="text-muted-foreground">Menu Items</Label>
+                        <p className="font-medium">{menuItems.length} items</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 space-y-2">
+              <p className="text-sm font-medium text-primary">What's Next?</p>
+              <ul className="text-sm text-foreground space-y-1 list-disc list-inside">
+                <li>Start managing your menu and orders</li>
+                <li>Update your restaurant information and hours</li>
+                <li>View analytics and track your performance</li>
+                <li>Start accepting orders from customers</li>
+              </ul>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              onClick={() => setShowApprovalModal(false)}
+              className="w-full bg-primary hover:bg-primary/90"
+            >
+              Get Started
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Password Modal */}
+      <Dialog open={showChangePasswordModal} onOpenChange={setShowChangePasswordModal}>
+        <DialogContent className="bg-card/95 backdrop-blur-sm border-white/20">
+          <DialogHeader>
+            <DialogTitle>Change Password</DialogTitle>
+            <DialogDescription>
+              Enter your current password and choose a new password
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setPasswordErrors({});
+              setPasswordSuccess(null);
+
+              // Validate passwords match
+              if (changePasswordForm.newPassword !== changePasswordForm.confirmPassword) {
+                setPasswordErrors({ confirmPassword: 'New passwords do not match' });
+                return;
+              }
+
+              // Validate password strength
+              if (changePasswordForm.newPassword.length < 6) {
+                setPasswordErrors({ newPassword: 'Password must be at least 6 characters long' });
+                return;
+              }
+
+              try {
+                setChangingPassword(true);
+                // Use restaurant email as username (same as login)
+                const restaurantUsername = restaurant?.email;
+                if (!restaurantUsername) {
+                  setPasswordErrors({ currentPassword: 'Restaurant email not found. Please sign in again.' });
+                  setChangingPassword(false);
+                  return;
+                }
+
+                const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+                const response = await fetch(`${API_BASE_URL}/auth/restaurant/change-password`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    username: restaurantUsername,
+                    currentPassword: changePasswordForm.currentPassword,
+                    newPassword: changePasswordForm.newPassword,
+                  }),
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                  // Success - clear form and show success message
+                  setChangePasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+                  setPasswordSuccess('Password changed successfully!');
+                  setPasswordErrors({});
+                  
+                  // Close modal after 2 seconds
+                  setTimeout(() => {
+                    setShowChangePasswordModal(false);
+                    setPasswordSuccess(null);
+                  }, 2000);
+                } else {
+                  // Error from backend
+                  const errorMessage = data.error || 'Failed to change password';
+                  if (errorMessage.toLowerCase().includes('current password')) {
+                    setPasswordErrors({ currentPassword: errorMessage });
+                  } else {
+                    setPasswordErrors({ newPassword: errorMessage });
+                  }
+                }
+              } catch (err: any) {
+                console.error('Change password error:', err);
+                setPasswordErrors({ currentPassword: 'Failed to change password. Please try again.' });
+              } finally {
+                setChangingPassword(false);
+              }
+            }}
+            className="space-y-4"
+          >
+            {passwordSuccess && (
+              <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+                <p className="text-sm text-green-400">{passwordSuccess}</p>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="restaurant-current-password">Current Password</Label>
+              <Input
+                id="restaurant-current-password"
+                type="password"
+                value={changePasswordForm.currentPassword}
+                onChange={(e) => setChangePasswordForm({ ...changePasswordForm, currentPassword: e.target.value })}
+                className="bg-background/50 border-white/10"
+                required
+              />
+              {passwordErrors.currentPassword && (
+                <p className="text-sm text-red-400">{passwordErrors.currentPassword}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="restaurant-new-password">New Password</Label>
+              <Input
+                id="restaurant-new-password"
+                type="password"
+                value={changePasswordForm.newPassword}
+                onChange={(e) => setChangePasswordForm({ ...changePasswordForm, newPassword: e.target.value })}
+                className="bg-background/50 border-white/10"
+                required
+              />
+              {passwordErrors.newPassword && (
+                <p className="text-sm text-red-400">{passwordErrors.newPassword}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="restaurant-confirm-password">Confirm New Password</Label>
+              <Input
+                id="restaurant-confirm-password"
+                type="password"
+                value={changePasswordForm.confirmPassword}
+                onChange={(e) => setChangePasswordForm({ ...changePasswordForm, confirmPassword: e.target.value })}
+                className="bg-background/50 border-white/10"
+                required
+              />
+              {passwordErrors.confirmPassword && (
+                <p className="text-sm text-red-400">{passwordErrors.confirmPassword}</p>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowChangePasswordModal(false);
+                  setChangePasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+                  setPasswordErrors({});
+                  setPasswordSuccess(null);
+                }}
+                disabled={changingPassword}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="bg-primary hover:bg-primary/90"
+                disabled={changingPassword}
+              >
+                {changingPassword ? 'Saving...' : 'Save New Password'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

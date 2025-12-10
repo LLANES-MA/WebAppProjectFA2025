@@ -9,8 +9,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from './ui/label';
 import { Separator } from './ui/separator';
 import { ScrollArea } from './ui/scroll-area';
-import { CheckCircle, XCircle, UserPlus, UserX, Car, LogOut, Building2, Users, Truck, Eye, MapPin, Phone, Mail, Clock, DollarSign } from 'lucide-react';
-import { getPendingRestaurants, getApprovedRestaurants } from '../services/restaurantService';
+import { CheckCircle, XCircle, UserPlus, UserX, Car, LogOut, Building2, Users, Truck, Eye, MapPin, Phone, Mail, Clock, DollarSign, Settings } from 'lucide-react';
+import { getPendingRestaurants, getApprovedRestaurants, getRestaurantMenu, getRestaurantHours } from '../services/restaurantService';
 import { approveRestaurant } from '../services/emailService';
 
 interface AdminDashboardProps {
@@ -39,7 +39,10 @@ export default function AdminDashboard({
   const [newDriverForm, setNewDriverForm] = useState({ firstName: "", lastName: "" });
   const [driverDialogOpen, setDriverDialogOpen] = useState(false);
   const [selectedRegistration, setSelectedRegistration] = useState<any>(null);
-  const [pendingRegistrations, setPendingRegistrations] = useState<any[]>(propPendingRegistrations);
+  const [selectedMenuItems, setSelectedMenuItems] = useState<any[]>([]);
+  const [selectedOperatingHours, setSelectedOperatingHours] = useState<any[]>([]);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [pendingRegistrations, setPendingRegistrations] = useState<any[]>([]);
   const [approvedRestaurants, setApprovedRestaurants] = useState<any[]>([]);
   const [pendingWithdrawals, setPendingWithdrawals] = useState<any[]>([]);
   const [staffMembers, setStaffMembers] = useState<any[]>([]);
@@ -48,6 +51,16 @@ export default function AdminDashboard({
   const [removedStaff, setRemovedStaff] = useState<Set<string>>(new Set());
   const [deactivatedDrivers, setDeactivatedDrivers] = useState<Set<number>>(new Set());
   const [approvedWithdrawals, setApprovedWithdrawals] = useState<Set<number>>(new Set());
+  const [approvingRestaurant, setApprovingRestaurant] = useState<number | null>(null);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [changePasswordForm, setChangePasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [passwordErrors, setPasswordErrors] = useState<{ [key: string]: string }>({});
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
+  const [changingPassword, setChangingPassword] = useState(false);
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
 
   // Fetch all data from API
@@ -79,14 +92,41 @@ export default function AdminDashboard({
     }
   }, [isLoggedIn]);
 
+  // Refresh data when registrations tab is opened
+  useEffect(() => {
+    if (isLoggedIn && activeTab === 'registrations') {
+      fetchAllData();
+    }
+  }, [activeTab, isLoggedIn]);
+
   const handleApproveRestaurant = async (id: number) => {
+    if (approvingRestaurant === id) {
+      console.log('⏳ Approval already in progress for restaurant', id);
+      return; // Prevent double-clicks
+    }
+
     try {
+      setApprovingRestaurant(id);
+      
       // Find restaurant to get email and name
       const restaurant = pendingRegistrations.find(r => r.id === id);
-      if (!restaurant) return;
+      if (!restaurant) {
+        alert('Restaurant not found');
+        return;
+      }
 
-      const result = await approveRestaurant(id, restaurant.email, restaurant.restaurantName);
+      console.log(`📝 Approving restaurant ${id}:`, {
+        id: restaurant.id,
+        name: restaurant.restaurantName || restaurant.name,
+        email: restaurant.email,
+      });
+
+      const result = await approveRestaurant(id, restaurant.email, restaurant.restaurantName || restaurant.name);
+      
       if (result.success) {
+        console.log('✅ Restaurant approved successfully');
+        console.log('📋 Menu items should already exist from registration');
+        
         // Refresh the list
         const [pending, approved] = await Promise.all([
           getPendingRestaurants(),
@@ -94,12 +134,54 @@ export default function AdminDashboard({
         ]);
         setPendingRegistrations(pending);
         setApprovedRestaurants(approved);
+        
         if (onApproveRestaurant) {
           onApproveRestaurant(id);
         }
+        
+        alert(`Restaurant approved successfully!\n\nCredentials have been sent to ${restaurant.email}\n\nMenu items from registration have been preserved.`);
+      } else {
+        console.error('❌ Approval failed:', result.error);
+        alert(`Failed to approve restaurant: ${result.error || 'Unknown error'}\n\nPlease check the console for more details.`);
       }
     } catch (err: any) {
-      console.error('Error approving restaurant:', err);
+      console.error('❌ Error approving restaurant:', err);
+      console.error('Error details:', {
+        message: err.message,
+        stack: err.stack,
+        restaurantId: id,
+      });
+      alert(`Error approving restaurant: ${err.message || 'Unknown error'}\n\nPlease check the console for more details.`);
+    } finally {
+      setApprovingRestaurant(null);
+    }
+  };
+
+  const handleViewDetails = async (registration: any) => {
+    setSelectedRegistration(registration);
+    setLoadingDetails(true);
+    try {
+      // Fetch menu items and operating hours from API
+      const [menuItems, hours] = await Promise.all([
+        getRestaurantMenu(registration.id).catch(() => []),
+        getRestaurantHours(registration.id).catch(() => [])
+      ]);
+      setSelectedMenuItems(menuItems);
+      
+      // Convert hours array to object format for display
+      const hoursObj: any = {};
+      hours.forEach((h: any) => {
+        hoursObj[h.dayOfWeek] = {
+          open: h.openTime,
+          close: h.closeTime,
+          closed: h.isClosed
+        };
+      });
+      setSelectedOperatingHours(hoursObj);
+    } catch (err: any) {
+      console.error('Error fetching details:', err);
+    } finally {
+      setLoadingDetails(false);
     }
   };
 
@@ -119,6 +201,8 @@ export default function AdminDashboard({
       });
       
       if (response.ok) {
+        // Store admin username in localStorage
+        localStorage.setItem('adminUsername', loginForm.email);
         setIsLoggedIn(true);
       } else {
         const errorData = await response.json();
@@ -472,6 +556,17 @@ export default function AdminDashboard({
               >
                 <Building2 className="h-4 w-4" />
                 Restaurant Registration
+              </button>
+              <button
+                onClick={() => setActiveTab("settings")}
+                className={`w-full justify-start gap-2 flex items-center px-3 py-2 rounded-md transition-colors ${
+                  activeTab === "settings" 
+                    ? "bg-primary/20 text-primary frontdash-glow" 
+                    : "hover:bg-primary/10 text-muted-foreground hover:text-primary"
+                }`}
+              >
+                <Settings className="h-4 w-4" />
+                Settings
               </button>
             </div>
           </nav>
@@ -878,37 +973,65 @@ export default function AdminDashboard({
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {(propPendingRegistrations.length > 0 ? propPendingRegistrations : pendingRegistrations).map((registration) => (
-                          <TableRow key={registration.id} className="border-white/10">
-                            <TableCell className="font-medium">{registration.name}</TableCell>
-                            <TableCell>{registration.email}</TableCell>
-                            <TableCell>{registration.phone}</TableCell>
-                            <TableCell>{registration.submittedAt}</TableCell>
-                            <TableCell>
-                              <div className="flex gap-2">
-                                <Dialog>
-                                  <DialogTrigger asChild>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => setSelectedRegistration(registration)}
-                                      className="border-primary/50 text-primary hover:bg-primary/10"
-                                    >
-                                      <Eye className="h-4 w-4 mr-1" />
-                                      Details
-                                    </Button>
-                                  </DialogTrigger>
+                        {loading ? (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center py-8">
+                              <p className="text-muted-foreground">Loading pending registrations...</p>
+                            </TableCell>
+                          </TableRow>
+                        ) : pendingRegistrations.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center py-8">
+                              <p className="text-muted-foreground">No pending registrations</p>
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          pendingRegistrations.map((registration) => {
+                            // Handle both old format (with name) and new format (with restaurantName)
+                            const restaurantName = registration.restaurantName || registration.name;
+                            const submittedAt = registration.createdAt 
+                              ? new Date(registration.createdAt).toLocaleDateString()
+                              : registration.submittedAt || 'N/A';
+                            
+                            return (
+                              <TableRow key={registration.id} className="border-white/10">
+                                <TableCell className="font-medium">{restaurantName}</TableCell>
+                                <TableCell>{registration.email}</TableCell>
+                                <TableCell>{registration.phone}</TableCell>
+                                <TableCell>{submittedAt}</TableCell>
+                                <TableCell>
+                                  <div className="flex gap-2">
+                                    <Dialog>
+                                      <DialogTrigger asChild>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => handleViewDetails(registration)}
+                                          className="border-primary/50 text-primary hover:bg-primary/10"
+                                        >
+                                          <Eye className="h-4 w-4 mr-1" />
+                                          Details
+                                        </Button>
+                                      </DialogTrigger>
                                   <DialogContent className="max-w-4xl max-h-[80vh] bg-card/95 backdrop-blur-sm border-white/20">
                                     <DialogHeader>
                                       <DialogTitle className="text-xl text-primary">
-                                        {registration.name} - Registration Details
+                                        {selectedRegistration?.restaurantName || selectedRegistration?.name} - Registration Details
                                       </DialogTitle>
                                       <DialogDescription>
-                                        Complete registration information submitted on {registration.submittedAt}
+                                        Complete registration information submitted on {
+                                          selectedRegistration?.createdAt 
+                                            ? new Date(selectedRegistration.createdAt).toLocaleDateString()
+                                            : selectedRegistration?.submittedAt || 'N/A'
+                                        }
                                       </DialogDescription>
                                     </DialogHeader>
                                     <ScrollArea className="h-[60vh] pr-4">
-                                      {selectedRegistration && (
+                                      {loadingDetails ? (
+                                        <div className="text-center py-8">
+                                          <p className="text-muted-foreground">Loading details...</p>
+                                        </div>
+                                      ) : selectedRegistration && (
                                         <div className="space-y-6">
                                           {/* Basic Information */}
                                           <Card className="frontdash-card-bg">
@@ -922,24 +1045,20 @@ export default function AdminDashboard({
                                               <div className="grid grid-cols-2 gap-4">
                                                 <div>
                                                   <Label className="text-muted-foreground">Restaurant Name</Label>
-                                                  <p className="font-medium">{selectedRegistration.details.restaurantName}</p>
+                                                  <p className="font-medium">{selectedRegistration.restaurantName || selectedRegistration.name}</p>
                                                 </div>
                                                 <div>
                                                   <Label className="text-muted-foreground">Cuisine Type</Label>
-                                                  <p className="font-medium">{selectedRegistration.details.cuisineType}</p>
+                                                  <p className="font-medium">{selectedRegistration.cuisineType || 'N/A'}</p>
                                                 </div>
                                                 <div>
                                                   <Label className="text-muted-foreground">Established Year</Label>
-                                                  <p className="font-medium">{selectedRegistration.details.establishedYear}</p>
-                                                </div>
-                                                <div>
-                                                  <Label className="text-muted-foreground">Owner Name</Label>
-                                                  <p className="font-medium">{selectedRegistration.details.ownerName}</p>
+                                                  <p className="font-medium">{selectedRegistration.establishedYear || 'N/A'}</p>
                                                 </div>
                                               </div>
                                               <div>
                                                 <Label className="text-muted-foreground">Description</Label>
-                                                <p className="font-medium mt-1">{selectedRegistration.details.description}</p>
+                                                <p className="font-medium mt-1">{selectedRegistration.description || 'N/A'}</p>
                                               </div>
                                             </CardContent>
                                           </Card>
@@ -956,27 +1075,27 @@ export default function AdminDashboard({
                                               <div className="grid grid-cols-2 gap-4">
                                                 <div>
                                                   <Label className="text-muted-foreground">Address</Label>
-                                                  <p className="font-medium">{selectedRegistration.details.address}</p>
+                                                  <p className="font-medium">{selectedRegistration.address || 'N/A'}</p>
                                                 </div>
                                                 <div>
                                                   <Label className="text-muted-foreground">City, State ZIP</Label>
                                                   <p className="font-medium">
-                                                    {selectedRegistration.details.city}, {selectedRegistration.details.state} {selectedRegistration.details.zipCode}
+                                                    {selectedRegistration.city || 'N/A'}, {selectedRegistration.state || 'N/A'} {selectedRegistration.zipCode || 'N/A'}
                                                   </p>
                                                 </div>
                                                 <div>
                                                   <Label className="text-muted-foreground">Phone</Label>
-                                                  <p className="font-medium">{selectedRegistration.phone}</p>
+                                                  <p className="font-medium">{selectedRegistration.phone || 'N/A'}</p>
                                                 </div>
                                                 <div>
                                                   <Label className="text-muted-foreground">Email</Label>
-                                                  <p className="font-medium">{selectedRegistration.email}</p>
+                                                  <p className="font-medium">{selectedRegistration.email || 'N/A'}</p>
                                                 </div>
                                               </div>
-                                              {selectedRegistration.details.website && (
+                                              {selectedRegistration.website && (
                                                 <div>
                                                   <Label className="text-muted-foreground">Website</Label>
-                                                  <p className="font-medium">{selectedRegistration.details.website}</p>
+                                                  <p className="font-medium">{selectedRegistration.website}</p>
                                                 </div>
                                               )}
                                             </CardContent>
@@ -994,34 +1113,26 @@ export default function AdminDashboard({
                                               <div className="grid grid-cols-2 gap-4">
                                                 <div>
                                                   <Label className="text-muted-foreground">Average Price Range</Label>
-                                                  <p className="font-medium">{selectedRegistration.details.averagePrice}</p>
+                                                  <p className="font-medium">{selectedRegistration.averagePrice || 'N/A'}</p>
                                                 </div>
                                                 <div>
                                                   <Label className="text-muted-foreground">Delivery Fee</Label>
-                                                  <p className="font-medium">${selectedRegistration.details.deliveryFee}</p>
+                                                  <p className="font-medium">${typeof selectedRegistration.deliveryFee === 'number' ? selectedRegistration.deliveryFee.toFixed(2) : selectedRegistration.deliveryFee || '0.00'}</p>
                                                 </div>
                                                 <div>
                                                   <Label className="text-muted-foreground">Minimum Order</Label>
-                                                  <p className="font-medium">${selectedRegistration.details.minimumOrder}</p>
+                                                  <p className="font-medium">${typeof selectedRegistration.minimumOrder === 'number' ? selectedRegistration.minimumOrder.toFixed(2) : selectedRegistration.minimumOrder || '0.00'}</p>
                                                 </div>
                                                 <div>
                                                   <Label className="text-muted-foreground">Preparation Time</Label>
-                                                  <p className="font-medium">{selectedRegistration.details.preparationTime} min</p>
-                                                </div>
-                                                <div>
-                                                  <Label className="text-muted-foreground">Business License</Label>
-                                                  <p className="font-medium">{selectedRegistration.details.businessLicense}</p>
-                                                </div>
-                                                <div>
-                                                  <Label className="text-muted-foreground">Tax ID</Label>
-                                                  <p className="font-medium">{selectedRegistration.details.taxId}</p>
+                                                  <p className="font-medium">{selectedRegistration.preparationTime || 'N/A'} min</p>
                                                 </div>
                                               </div>
                                             </CardContent>
                                           </Card>
 
                                           {/* Operating Hours */}
-                                          {selectedRegistration.details.operatingHours && (
+                                          {(selectedOperatingHours && Object.keys(selectedOperatingHours).length > 0) && (
                                             <Card className="frontdash-card-bg">
                                               <CardHeader>
                                                 <CardTitle className="text-lg flex items-center gap-2">
@@ -1031,7 +1142,7 @@ export default function AdminDashboard({
                                               </CardHeader>
                                               <CardContent>
                                                 <div className="grid grid-cols-1 gap-2">
-                                                  {Object.entries(selectedRegistration.details.operatingHours).map(([day, hours]: [string, any]) => (
+                                                  {Object.entries(selectedOperatingHours).map(([day, hours]: [string, any]) => (
                                                     <div key={day} className="flex justify-between items-center py-1 border-b border-white/5 last:border-0">
                                                       <span className="text-sm font-medium capitalize">{day}:</span>
                                                       <span className="text-sm text-muted-foreground">
@@ -1050,27 +1161,39 @@ export default function AdminDashboard({
                                           )}
 
                                           {/* Sample Menu Items */}
-                                          <Card className="frontdash-card-bg">
-                                            <CardHeader>
-                                              <CardTitle className="text-lg">Sample Menu Items</CardTitle>
-                                            </CardHeader>
-                                            <CardContent>
-                                              <div className="space-y-4">
-                                                {selectedRegistration.details.menuItems.map((item: any, index: number) => (
-                                                  <div key={index} className="border border-white/10 rounded-lg p-4 bg-background/50">
-                                                    <div className="flex justify-between items-start mb-2">
-                                                      <h4 className="font-medium">{item.name}</h4>
-                                                      <Badge variant="outline" className="text-primary border-primary/50">
-                                                        ${item.price}
-                                                      </Badge>
+                                          {selectedMenuItems.length > 0 && (
+                                            <Card className="frontdash-card-bg">
+                                              <CardHeader>
+                                                <CardTitle className="text-lg">Sample Menu Items</CardTitle>
+                                              </CardHeader>
+                                              <CardContent>
+                                                <div className="space-y-4">
+                                                  {selectedMenuItems.map((item: any, index: number) => (
+                                                    <div key={item.id || index} className="border border-white/10 rounded-lg p-4 bg-background/50">
+                                                      <div className="flex justify-between items-start mb-2">
+                                                        <h4 className="font-medium">{item.name}</h4>
+                                                        <Badge variant="outline" className="text-primary border-primary/50">
+                                                          ${typeof item.price === 'number' ? item.price.toFixed(2) : item.price}
+                                                        </Badge>
+                                                      </div>
+                                                      <p className="text-muted-foreground text-sm">{item.description || 'No description'}</p>
+                                                      <p className="text-xs text-muted-foreground mt-1">Category: {item.category || 'Other'}</p>
                                                     </div>
-                                                    <p className="text-muted-foreground text-sm">{item.description}</p>
-                                                    <p className="text-xs text-muted-foreground mt-1">Category: {item.category}</p>
-                                                  </div>
-                                                ))}
-                                              </div>
-                                            </CardContent>
-                                          </Card>
+                                                  ))}
+                                                </div>
+                                              </CardContent>
+                                            </Card>
+                                          )}
+                                          {selectedMenuItems.length === 0 && (
+                                            <Card className="frontdash-card-bg">
+                                              <CardHeader>
+                                                <CardTitle className="text-lg">Sample Menu Items</CardTitle>
+                                              </CardHeader>
+                                              <CardContent>
+                                                <p className="text-muted-foreground">No menu items submitted</p>
+                                              </CardContent>
+                                            </Card>
+                                          )}
                                         </div>
                                       )}
                                     </ScrollArea>
@@ -1079,10 +1202,11 @@ export default function AdminDashboard({
                                 <Button
                                   size="sm"
                                   onClick={() => handleApproveRegistration(registration.id)}
-                                  className="bg-green-600 hover:bg-green-700 frontdash-glow"
+                                  disabled={approvingRestaurant === registration.id}
+                                  className="bg-green-600 hover:bg-green-700 frontdash-glow disabled:opacity-50"
                                 >
                                   <CheckCircle className="h-4 w-4 mr-1" />
-                                  Approve
+                                  {approvingRestaurant === registration.id ? 'Approving...' : 'Approve'}
                                 </Button>
                                 <Button
                                   size="sm"
@@ -1096,7 +1220,9 @@ export default function AdminDashboard({
                               </div>
                             </TableCell>
                           </TableRow>
-                        ))}
+                            );
+                          })
+                        )}
                       </TableBody>
                     </Table>
                   </div>
@@ -1195,9 +1321,193 @@ export default function AdminDashboard({
                 </Card>
               </div>
             </TabsContent>
+
+            {/* Settings Tab */}
+            <TabsContent value="settings" className="space-y-6 mt-0">
+              <Card className="frontdash-card-bg">
+                <CardHeader>
+                  <CardTitle>Admin Settings</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div>
+                    <h3 className="text-lg font-medium mb-4">Account Settings</h3>
+                    <div className="flex items-center gap-4 pt-4">
+                      <Button
+                        onClick={() => setShowChangePasswordModal(true)}
+                        className="bg-primary hover:bg-primary/90"
+                      >
+                        Change Password
+                      </Button>
+                      <Button
+                        className="bg-primary hover:bg-primary/90"
+                        disabled
+                      >
+                        Save Changes
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
           </Tabs>
         </main>
       </div>
+
+      {/* Change Password Modal */}
+      <Dialog open={showChangePasswordModal} onOpenChange={setShowChangePasswordModal}>
+        <DialogContent className="bg-card/95 backdrop-blur-sm border-white/20">
+          <DialogHeader>
+            <DialogTitle>Change Password</DialogTitle>
+            <DialogDescription>
+              Enter your current password and choose a new password
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setPasswordErrors({});
+              setPasswordSuccess(null);
+
+              // Validate passwords match
+              if (changePasswordForm.newPassword !== changePasswordForm.confirmPassword) {
+                setPasswordErrors({ confirmPassword: 'New passwords do not match' });
+                return;
+              }
+
+              // Validate password strength
+              if (changePasswordForm.newPassword.length < 6) {
+                setPasswordErrors({ newPassword: 'Password must be at least 6 characters long' });
+                return;
+              }
+
+              try {
+                setChangingPassword(true);
+                const adminUsername = localStorage.getItem('adminUsername') || loginForm.email;
+                if (!adminUsername) {
+                  setPasswordErrors({ currentPassword: 'You must be logged in to change your password' });
+                  setChangingPassword(false);
+                  return;
+                }
+
+                const response = await fetch(`${API_BASE_URL}/auth/admin/change-password`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    username: adminUsername,
+                    currentPassword: changePasswordForm.currentPassword,
+                    newPassword: changePasswordForm.newPassword,
+                  }),
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                  // Success - clear form and show success message
+                  setChangePasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+                  setPasswordSuccess('Password changed successfully!');
+                  setPasswordErrors({});
+                  
+                  // Close modal after 2 seconds
+                  setTimeout(() => {
+                    setShowChangePasswordModal(false);
+                    setPasswordSuccess(null);
+                  }, 2000);
+                } else {
+                  // Error from backend
+                  const errorMessage = data.error || 'Failed to change password';
+                  if (errorMessage.toLowerCase().includes('current password')) {
+                    setPasswordErrors({ currentPassword: errorMessage });
+                  } else {
+                    setPasswordErrors({ newPassword: errorMessage });
+                  }
+                }
+              } catch (err: any) {
+                console.error('Change password error:', err);
+                setPasswordErrors({ currentPassword: 'Failed to change password. Please try again.' });
+              } finally {
+                setChangingPassword(false);
+              }
+            }}
+            className="space-y-4"
+          >
+            {passwordSuccess && (
+              <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+                <p className="text-sm text-green-400">{passwordSuccess}</p>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="current-password">Current Password</Label>
+              <Input
+                id="current-password"
+                type="password"
+                value={changePasswordForm.currentPassword}
+                onChange={(e) => setChangePasswordForm({ ...changePasswordForm, currentPassword: e.target.value })}
+                className="bg-background/50 border-white/10"
+                required
+              />
+              {passwordErrors.currentPassword && (
+                <p className="text-sm text-red-400">{passwordErrors.currentPassword}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="new-password">New Password</Label>
+              <Input
+                id="new-password"
+                type="password"
+                value={changePasswordForm.newPassword}
+                onChange={(e) => setChangePasswordForm({ ...changePasswordForm, newPassword: e.target.value })}
+                className="bg-background/50 border-white/10"
+                required
+              />
+              {passwordErrors.newPassword && (
+                <p className="text-sm text-red-400">{passwordErrors.newPassword}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">Confirm New Password</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                value={changePasswordForm.confirmPassword}
+                onChange={(e) => setChangePasswordForm({ ...changePasswordForm, confirmPassword: e.target.value })}
+                className="bg-background/50 border-white/10"
+                required
+              />
+              {passwordErrors.confirmPassword && (
+                <p className="text-sm text-red-400">{passwordErrors.confirmPassword}</p>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowChangePasswordModal(false);
+                  setChangePasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+                  setPasswordErrors({});
+                  setPasswordSuccess(null);
+                }}
+                disabled={changingPassword}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="bg-primary hover:bg-primary/90"
+                disabled={changingPassword}
+              >
+                {changingPassword ? 'Saving...' : 'Save New Password'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

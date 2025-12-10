@@ -231,8 +231,10 @@ export async function approveRestaurant(
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || `Approval failed with status ${response.status}`);
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        const errorMessage = errorData.error || errorData.message || `Approval failed with status ${response.status}`;
+        console.error('❌ Approval API error:', errorData);
+        throw new Error(errorMessage);
       }
 
       const result = await response.json();
