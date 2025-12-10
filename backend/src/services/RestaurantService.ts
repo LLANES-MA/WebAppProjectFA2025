@@ -19,6 +19,7 @@ export interface RestaurantRegistrationData {
   state: string;
   zipCode: string;
   phone: string;
+  contactPerson?: string;
   email: string;
   website?: string;
   averagePrice: string;
@@ -69,10 +70,13 @@ export class RestaurantService {
         preparationTime: parseInt(data.preparationTime) || 30,
         status: 'pending',
       };
+      
 
       // Create restaurant
       console.log('📝 Creating restaurant entry...');
-      const restaurant = await db.createRestaurant(restaurantInput);
+      // Pass contactPerson separately since it's not in RestaurantCreateInput
+      const contactPerson = data.contactPerson || data.email;
+      const restaurant = await db.createRestaurant(restaurantInput, contactPerson);
       console.log('✅ Restaurant created:', restaurant.id);
 
       // Create restaurant hours
@@ -180,7 +184,7 @@ export class RestaurantService {
     }
 
     // Update status to WITHDRAWAL (pending withdrawal approval)
-    await db.updateRestaurantStatus(restaurantId, 'WITHDRAWAL', restaurant.status === 'approved' ? 1 : 0);
+    await db.updateRestaurantStatus(restaurantId, 'WITHDRAWAL', restaurant.status === 'approved');
     
     const updatedRestaurant = await this.getRestaurant(restaurantId);
     if (!updatedRestaurant) {

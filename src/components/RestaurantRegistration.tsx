@@ -60,6 +60,7 @@ export default function RestaurantRegistration({ onComplete, onBack, initialAcco
     state: string;
     zipCode: string;
     phone: string;
+    contactPerson: string;
     email: string;
     website: string;
     averagePrice: string;
@@ -85,6 +86,7 @@ export default function RestaurantRegistration({ onComplete, onBack, initialAcco
     state: '',
     zipCode: '',
     phone: '',
+    contactPerson: '',
     email: initialAccountData?.email || '',
     website: '',
     averagePrice: '',
@@ -226,11 +228,23 @@ export default function RestaurantRegistration({ onComplete, onBack, initialAcco
         newErrors.zipCode = 'ZIP code must be 5 digits';
       }
 
-      // Phone validation (10 digits)
+      // Contact person validation
+      if (!formData.contactPerson || !formData.contactPerson.trim()) {
+        newErrors.contactPerson = 'Contact person is required';
+      } else if (formData.contactPerson.trim().length < 2) {
+        newErrors.contactPerson = 'Contact person name must be at least 2 characters';
+      }
+
+      // Phone validation (10 digits, first digit cannot be 0)
       if (!formData.phone) {
         newErrors.phone = 'Phone number is required';
-      } else if (!/^\d{10}$/.test(formData.phone.replace(/\D/g, ''))) {
-        newErrors.phone = 'Enter a valid 10-digit phone number';
+      } else {
+        const phoneDigits = formData.phone.replace(/\D/g, '');
+        if (phoneDigits.length !== 10) {
+          newErrors.phone = 'Phone number must be exactly 10 digits';
+        } else if (phoneDigits[0] === '0') {
+          newErrors.phone = 'Phone number cannot start with 0';
+        }
       }
 
       // Email validation
@@ -474,6 +488,18 @@ export default function RestaurantRegistration({ onComplete, onBack, initialAcco
               </div>
 
               <Separator className="bg-white/10" />
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Contact Person *</label>
+                <Input
+                  placeholder="John Doe"
+                  value={formData.contactPerson}
+                  onChange={(e) => updateFormData('contactPerson', e.target.value)}
+                  className={`bg-card/50 border-white/10 ${errors.contactPerson ? 'border-destructive' : ''}`}
+                />
+                {errors.contactPerson && <p className="text-xs text-destructive mt-1">{errors.contactPerson}</p>}
+                <p className="text-xs text-muted-foreground mt-1">This person will be contacted for questions, concerns, and inquiries</p>
+              </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>

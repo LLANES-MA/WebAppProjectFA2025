@@ -85,14 +85,24 @@ export default function AllRestaurants({ onBack, onRestaurantSelect, onRestauran
     const dayKey = currentDay as keyof typeof restaurant.operatingHours;
     const todayHours = restaurant.operatingHours[dayKey];
     
-    // If restaurant is closed on this day
-    if (todayHours?.closed) {
+    // If no operating hours set for this day, assume closed (safer default)
+    if (!todayHours) {
+      return true; // If day is missing, assume closed
+    }
+    
+    // If restaurant is explicitly marked as closed on this day
+    if (todayHours.closed === true) {
       return true;
     }
     
-    // If no operating hours set for this day
-    if (!todayHours?.open || !todayHours?.close) {
-      return false; // Assume open if no hours specified
+    // Fallback: Check if times are 00:00-00:00 (indicates closed if is_closed column doesn't exist)
+    if (todayHours.open === '00:00' && todayHours.close === '00:00') {
+      return true;
+    }
+    
+    // If no open/close times specified, assume closed
+    if (!todayHours.open || !todayHours.close) {
+      return true; // Assume closed if no hours specified
     }
     
     // Check if current time is within operating hours

@@ -418,22 +418,82 @@ export default function AdminDashboard({
     }
   };
 
-  const handleFireDriver = (driverId: number) => {
+  const handleFireDriver = async (driverId: number) => {
     if (!confirm(`Are you sure you want to deactivate this driver?`)) {
       return;
     }
     
-    // Grey out the driver (UI only)
-    setDeactivatedDrivers(prev => new Set(prev).add(driverId));
-    // Also update the driver's isActive status in the local state for visual feedback
-    setDrivers(prevDrivers => 
-      prevDrivers.map(driver => 
-        driver.driverId === driverId 
-          ? { ...driver, isActive: false }
-          : driver
-      )
-    );
-    alert('Driver has been marked as deactivated');
+    try {
+      // Call backend API to update driver status in database
+      const response = await fetch(`${API_BASE_URL}/drivers/${driverId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          isActive: false,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to deactivate driver');
+      }
+
+      // Update local state after successful database update
+      setDeactivatedDrivers(prev => new Set(prev).add(driverId));
+      setDrivers(prevDrivers => 
+        prevDrivers.map(driver => 
+          driver.driverId === driverId 
+            ? { ...driver, isActive: false }
+            : driver
+        )
+      );
+      
+      alert('Driver has been deactivated successfully');
+    } catch (err: any) {
+      console.error('Error deactivating driver:', err);
+      alert('Failed to deactivate driver: ' + err.message);
+    }
+  };
+
+  const handleReactivateDriver = async (driverId: number) => {
+    try {
+      // Call backend API to update driver status in database
+      const response = await fetch(`${API_BASE_URL}/drivers/${driverId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          isActive: true,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to reactivate driver');
+      }
+
+      // Update local state after successful database update
+      setDeactivatedDrivers(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(driverId);
+        return newSet;
+      });
+      setDrivers(prevDrivers => 
+        prevDrivers.map(driver => 
+          driver.driverId === driverId 
+            ? { ...driver, isActive: true }
+            : driver
+        )
+      );
+      
+      alert('Driver has been reactivated successfully');
+    } catch (err: any) {
+      console.error('Error reactivating driver:', err);
+      alert('Failed to reactivate driver: ' + err.message);
+    }
   };
 
   // Login Screen
@@ -653,8 +713,10 @@ export default function AdminDashboard({
                         </TableRow>
                       ) : (
                         drivers.map((driver: any) => {
+                          // Use database isActive status (persists after refresh)
+                          // Check if driver is explicitly inactive (false) or if it's in the deactivated set (immediate UI feedback)
                           const isDeactivated = deactivatedDrivers.has(driver.driverId);
-                          const displayActive = isDeactivated ? false : driver.isActive;
+                          const displayActive = isDeactivated ? false : (driver.isActive === true);
                           
                           return (
                             <TableRow 
@@ -682,22 +744,7 @@ export default function AdminDashboard({
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => {
-                                      // Restore the driver
-                                      setDeactivatedDrivers(prev => {
-                                        const newSet = new Set(prev);
-                                        newSet.delete(driver.driverId);
-                                        return newSet;
-                                      });
-                                      setDrivers(prevDrivers => 
-                                        prevDrivers.map(d => 
-                                          d.driverId === driver.driverId 
-                                            ? { ...d, isActive: true }
-                                            : d
-                                        )
-                                      );
-                                      alert('Driver reactivated');
-                                    }}
+                                    onClick={() => handleReactivateDriver(driver.driverId)}
                                     className="border-green-500/50 text-green-400 hover:bg-green-500/10"
                                   >
                                     <CheckCircle className="h-4 w-4 mr-1" />
@@ -717,22 +764,7 @@ export default function AdminDashboard({
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => {
-                                      // Reactivate the driver (UI only)
-                                      setDeactivatedDrivers(prev => {
-                                        const newSet = new Set(prev);
-                                        newSet.delete(driver.driverId);
-                                        return newSet;
-                                      });
-                                      setDrivers(prevDrivers => 
-                                        prevDrivers.map(d => 
-                                          d.driverId === driver.driverId 
-                                            ? { ...d, isActive: true }
-                                            : d
-                                        )
-                                      );
-                                      alert('Driver reactivated');
-                                    }}
+                                    onClick={() => handleReactivateDriver(driver.driverId)}
                                     className="border-green-500/50 text-green-400 hover:bg-green-500/10"
                                   >
                                     <CheckCircle className="h-4 w-4 mr-1" />

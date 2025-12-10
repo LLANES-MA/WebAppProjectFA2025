@@ -3,6 +3,7 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from './ui/sheet';
 import { useState } from 'react';
 
@@ -28,15 +29,30 @@ export default function Checkout({ cartItems, total, onBack, onOrderComplete, on
     state: '',
     zipCode: '',
     
+    // Contact Person
+    contactPersonName: '',
+    
     // Payment
+    cardType: '',
     cardNumber: '',
     expiryDate: '',
     cvv: '',
     cardName: '',
     
+    // Billing Address
+    billingStreet: '',
+    billingApartment: '',
+    billingCity: '',
+    billingState: '',
+    billingZipCode: '',
+    
     // Contact
     phone: '',
     email: '',
+    
+    // Tips
+    tipAmount: '',
+    tipType: 'fixed', // 'fixed' or 'percentage'
     
     // Delivery Instructions
     instructions: ''
@@ -52,6 +68,7 @@ export default function Checkout({ cartItems, total, onBack, onOrderComplete, on
     if (!formData.city.trim()) newErrors.city = 'City is required';
     if (!formData.state.trim()) newErrors.state = 'State is required';
     if (!formData.zipCode.trim()) newErrors.zipCode = 'ZIP code is required';
+    if (!formData.contactPersonName.trim()) newErrors.contactPersonName = 'Contact person name is required';
     if (!formData.phone.trim()) newErrors.phone = 'Phone number is required';
     if (!formData.email.trim()) newErrors.email = 'Email is required';
     
@@ -61,10 +78,12 @@ export default function Checkout({ cartItems, total, onBack, onOrderComplete, on
       newErrors.email = 'Please enter a valid email address';
     }
     
-    // Basic phone validation
-    const phoneRegex = /^\(?([0-9]{3})\)?[-. ]?([0-9]{3})[-. ]?([0-9]{4})$/;
-    if (formData.phone && !phoneRegex.test(formData.phone)) {
-      newErrors.phone = 'Please enter a valid phone number';
+    // Phone validation: 10 digits, first digit cannot be 0
+    const phoneDigits = formData.phone.replace(/\D/g, '');
+    if (phoneDigits.length !== 10) {
+      newErrors.phone = 'Phone number must be exactly 10 digits';
+    } else if (phoneDigits[0] === '0') {
+      newErrors.phone = 'Phone number cannot start with 0';
     }
     
     setErrors(newErrors);
@@ -74,15 +93,24 @@ export default function Checkout({ cartItems, total, onBack, onOrderComplete, on
   const validateStep2 = () => {
     const newErrors: {[key: string]: string} = {};
     
+    if (!formData.cardType.trim()) newErrors.cardType = 'Card type is required';
     if (!formData.cardNumber.trim()) newErrors.cardNumber = 'Card number is required';
     if (!formData.expiryDate.trim()) newErrors.expiryDate = 'Expiry date is required';
     if (!formData.cvv.trim()) newErrors.cvv = 'CVV is required';
     if (!formData.cardName.trim()) newErrors.cardName = 'Cardholder name is required';
     
-    // Simple card number validation (Luhn algorithm simulation)
+    // Billing address validation
+    if (!formData.billingStreet.trim()) newErrors.billingStreet = 'Billing street address is required';
+    if (!formData.billingCity.trim()) newErrors.billingCity = 'Billing city is required';
+    if (!formData.billingState.trim()) newErrors.billingState = 'Billing state is required';
+    if (!formData.billingZipCode.trim()) newErrors.billingZipCode = 'Billing ZIP code is required';
+    
+    // Credit card validation: exactly 16 digits, first digit cannot be 0
     const cardNumber = formData.cardNumber.replace(/\s/g, '');
-    if (cardNumber && (cardNumber.length < 13 || cardNumber.length > 19)) {
-      newErrors.cardNumber = 'Please enter a valid card number';
+    if (cardNumber.length !== 16) {
+      newErrors.cardNumber = 'Card number must be exactly 16 digits';
+    } else if (cardNumber[0] === '0') {
+      newErrors.cardNumber = 'Card number cannot start with 0';
     }
     
     // Simple expiry date validation
@@ -159,12 +187,23 @@ export default function Checkout({ cartItems, total, onBack, onOrderComplete, on
     try {
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
       
-      // Calculate subtotal, tax, tip, and delivery fee
+      // Calculate subtotal, service charge, tip, and delivery fee
       const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-      const tax = subtotal * 0.08; // 8% tax
+      const serviceCharge = subtotal * 0.0825; // 8.25% service charge
       const deliveryFee = subtotal > 25 ? 0 : 2.99;
-      const tip = 0; // Can be added later if needed
-      const grandTotal = subtotal + tax + deliveryFee + tip;
+      
+      // Calculate tip (percentage or fixed amount)
+      let tip = 0;
+      if (formData.tipAmount && formData.tipAmount.trim()) {
+        const tipValue = parseFloat(formData.tipAmount);
+        if (formData.tipType === 'percentage') {
+          tip = subtotal * (tipValue / 100);
+        } else {
+          tip = tipValue;
+        }
+      }
+      
+      const grandTotal = subtotal + serviceCharge + deliveryFee + tip;
       
       // Create order payload
       const orderData = {
@@ -183,7 +222,7 @@ export default function Checkout({ cartItems, total, onBack, onOrderComplete, on
         customer: {
           email: formData.email,
           phone: formData.phone,
-          fullName: formData.cardName || formData.email.split('@')[0],
+          fullName: formData.contactPersonName || formData.cardName || formData.email.split('@')[0],
         },
         items: cartItems.map(item => ({
           itemId: item.id,
@@ -482,6 +521,18 @@ export default function Checkout({ cartItems, total, onBack, onOrderComplete, on
                     </div>
                     
                     <div>
+                      <Label htmlFor="contactPersonName">Contact Person Name *</Label>
+                      <Input
+                        id="contactPersonName"
+                        value={formData.contactPersonName}
+                        onChange={(e) => handleInputChange('contactPersonName', e.target.value)}
+                        className={errors.contactPersonName ? 'border-destructive' : ''}
+                        placeholder="John Doe"
+                      />
+                      {errors.contactPersonName && <p className="text-xs text-destructive mt-1">{errors.contactPersonName}</p>}
+                    </div>
+                    
+                    <div>
                       <Label htmlFor="phone">Phone Number *</Label>
                       <Input
                         id="phone"
@@ -535,6 +586,23 @@ export default function Checkout({ cartItems, total, onBack, onOrderComplete, on
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
+                      <Label htmlFor="cardType">Card Type *</Label>
+                      <Select value={formData.cardType} onValueChange={(value) => handleInputChange('cardType', value)}>
+                        <SelectTrigger className={errors.cardType ? 'border-destructive' : ''}>
+                          <SelectValue placeholder="Select card type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="VISA">VISA</SelectItem>
+                          <SelectItem value="MasterCard">MasterCard</SelectItem>
+                          <SelectItem value="Discover">Discover</SelectItem>
+                          <SelectItem value="American Express">American Express</SelectItem>
+                          <SelectItem value="Other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {errors.cardType && <p className="text-xs text-destructive mt-1">{errors.cardType}</p>}
+                    </div>
+                    
+                    <div className="md:col-span-2">
                       <Label htmlFor="cardNumber">Card Number *</Label>
                       <Input
                         id="cardNumber"
@@ -586,6 +654,102 @@ export default function Checkout({ cartItems, total, onBack, onOrderComplete, on
                     </div>
                   </div>
                   
+                  {/* Billing Address */}
+                  <div className="border-t border-white/10 pt-4">
+                    <h3 className="font-semibold text-foreground mb-4">Billing Address</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="md:col-span-2">
+                        <Label htmlFor="billingStreet">Street Address *</Label>
+                        <Input
+                          id="billingStreet"
+                          value={formData.billingStreet}
+                          onChange={(e) => handleInputChange('billingStreet', e.target.value)}
+                          className={errors.billingStreet ? 'border-destructive' : ''}
+                          placeholder="123 Main Street"
+                        />
+                        {errors.billingStreet && <p className="text-xs text-destructive mt-1">{errors.billingStreet}</p>}
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="billingApartment">Apartment/Suite</Label>
+                        <Input
+                          id="billingApartment"
+                          value={formData.billingApartment}
+                          onChange={(e) => handleInputChange('billingApartment', e.target.value)}
+                          placeholder="Apt 4B"
+                        />
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="billingCity">City *</Label>
+                        <Input
+                          id="billingCity"
+                          value={formData.billingCity}
+                          onChange={(e) => handleInputChange('billingCity', e.target.value)}
+                          className={errors.billingCity ? 'border-destructive' : ''}
+                          placeholder="New York"
+                        />
+                        {errors.billingCity && <p className="text-xs text-destructive mt-1">{errors.billingCity}</p>}
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="billingState">State *</Label>
+                        <Input
+                          id="billingState"
+                          value={formData.billingState}
+                          onChange={(e) => handleInputChange('billingState', e.target.value)}
+                          className={errors.billingState ? 'border-destructive' : ''}
+                          placeholder="NY"
+                        />
+                        {errors.billingState && <p className="text-xs text-destructive mt-1">{errors.billingState}</p>}
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="billingZipCode">ZIP Code *</Label>
+                        <Input
+                          id="billingZipCode"
+                          value={formData.billingZipCode}
+                          onChange={(e) => handleInputChange('billingZipCode', e.target.value)}
+                          className={errors.billingZipCode ? 'border-destructive' : ''}
+                          placeholder="10001"
+                        />
+                        {errors.billingZipCode && <p className="text-xs text-destructive mt-1">{errors.billingZipCode}</p>}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Tips Section */}
+                  <div className="border-t border-white/10 pt-4">
+                    <h3 className="font-semibold text-foreground mb-4">Tips</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="tipType">Tip Type</Label>
+                        <Select value={formData.tipType} onValueChange={(value) => handleInputChange('tipType', value)}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="fixed">Fixed Amount ($)</SelectItem>
+                            <SelectItem value="percentage">Percentage (%)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="tipAmount">Tip Amount</Label>
+                        <Input
+                          id="tipAmount"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={formData.tipAmount}
+                          onChange={(e) => handleInputChange('tipAmount', e.target.value)}
+                          placeholder={formData.tipType === 'percentage' ? '15' : '5.00'}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  
                   <div className="flex space-x-4">
                     <Button variant="outline" onClick={() => setStep(1)} className="flex-1">
                       Back
@@ -607,12 +771,41 @@ export default function Checkout({ cartItems, total, onBack, onOrderComplete, on
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
+                  {/* Order Date/Time */}
+                  <div className="bg-primary/10 p-4 rounded-lg">
+                    <div className="flex items-center space-x-2 text-primary">
+                      <Clock className="h-4 w-4" />
+                      <div>
+                        <span className="font-semibold">Order Date & Time: </span>
+                        <span>{new Date().toLocaleString('en-US', { 
+                          weekday: 'long', 
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Restaurant Info */}
+                  {selectedRestaurant && (
+                    <div>
+                      <h3 className="font-semibold text-foreground mb-2">Restaurant</h3>
+                      <div className="text-sm text-muted-foreground">
+                        <p className="font-medium text-foreground">{selectedRestaurant.name || selectedRestaurant.restaurantName}</p>
+                      </div>
+                    </div>
+                  )}
+                  
                   {/* Delivery Info */}
                   <div>
                     <h3 className="font-semibold text-foreground mb-2">Delivery Address</h3>
                     <div className="text-sm text-muted-foreground">
                       <p>{formData.street} {formData.apartment}</p>
                       <p>{formData.city}, {formData.state} {formData.zipCode}</p>
+                      <p>Contact: {formData.contactPersonName}</p>
                       <p>Phone: {formData.phone}</p>
                       <p>Email: {formData.email}</p>
                       {formData.instructions && <p>Instructions: {formData.instructions}</p>}
@@ -623,7 +816,8 @@ export default function Checkout({ cartItems, total, onBack, onOrderComplete, on
                   <div>
                     <h3 className="font-semibold text-foreground mb-2">Payment Method</h3>
                     <div className="text-sm text-muted-foreground">
-                      <p>**** **** **** {formData.cardNumber.slice(-4)}</p>
+                      <p>{formData.cardType}</p>
+                      <p>**** **** **** {formData.cardNumber.replace(/\s/g, '').slice(-4)}</p>
                       <p>{formData.cardName}</p>
                     </div>
                   </div>
@@ -645,7 +839,18 @@ export default function Checkout({ cartItems, total, onBack, onOrderComplete, on
                       disabled={isProcessing}
                       className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground"
                     >
-                      {isProcessing ? 'Processing...' : `Place Order - $${total.toFixed(2)}`}
+                      {isProcessing ? 'Processing...' : (() => {
+                        const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                        const serviceCharge = subtotal * 0.0825;
+                        const deliveryFee = subtotal > 25 ? 0 : 2.99;
+                        let tip = 0;
+                        if (formData.tipAmount && formData.tipAmount.trim()) {
+                          const tipValue = parseFloat(formData.tipAmount);
+                          tip = formData.tipType === 'percentage' ? subtotal * (tipValue / 100) : tipValue;
+                        }
+                        const grandTotal = subtotal + serviceCharge + deliveryFee + tip;
+                        return `Place Order - $${grandTotal.toFixed(2)}`;
+                      })()}
                     </Button>
                   </div>
                 </CardContent>
@@ -671,24 +876,51 @@ export default function Checkout({ cartItems, total, onBack, onOrderComplete, on
                   ))}
                 </div>
                 
-                <div className="border-t border-white/10 pt-4 space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Subtotal</span>
-                    <span className="text-foreground">${(total - (total * 0.08) - (total > 25 ? 0 : 2.99)).toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Tax</span>
-                    <span className="text-foreground">${(total * 0.08).toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Delivery</span>
-                    <span className="text-foreground">{total > 25 ? 'Free' : '$2.99'}</span>
-                  </div>
-                  <div className="flex justify-between font-semibold pt-2 border-t border-white/10">
-                    <span className="text-foreground">Total</span>
-                    <span className="text-primary">${total.toFixed(2)}</span>
-                  </div>
-                </div>
+                {(() => {
+                  const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                  const serviceCharge = subtotal * 0.0825;
+                  const deliveryFee = subtotal > 25 ? 0 : 2.99;
+                  
+                  // Calculate tip
+                  let tip = 0;
+                  if (formData.tipAmount && formData.tipAmount.trim()) {
+                    const tipValue = parseFloat(formData.tipAmount);
+                    if (formData.tipType === 'percentage') {
+                      tip = subtotal * (tipValue / 100);
+                    } else {
+                      tip = tipValue;
+                    }
+                  }
+                  
+                  const grandTotal = subtotal + serviceCharge + deliveryFee + tip;
+                  
+                  return (
+                    <div className="border-t border-white/10 pt-4 space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Subtotal</span>
+                        <span className="text-foreground">${subtotal.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Service Charge (8.25%)</span>
+                        <span className="text-foreground">${serviceCharge.toFixed(2)}</span>
+                      </div>
+                      {tip > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Tips</span>
+                          <span className="text-foreground">${tip.toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Delivery</span>
+                        <span className="text-foreground">{deliveryFee === 0 ? 'Free' : `$${deliveryFee.toFixed(2)}`}</span>
+                      </div>
+                      <div className="flex justify-between font-semibold pt-2 border-t border-white/10">
+                        <span className="text-foreground">Grand Total</span>
+                        <span className="text-primary">${grandTotal.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
               </CardContent>
             </Card>
           </div>

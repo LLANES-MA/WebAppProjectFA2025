@@ -219,20 +219,11 @@ export default function RestaurantDashboard({ onBack, restaurantId, restaurantSt
             sunday: { open: '', close: '', closed: true }
           };
           
-          // Map weekday numbers to day names
-          const dayMap: { [key: number]: string } = {
-            0: 'sunday',
-            1: 'monday',
-            2: 'tuesday',
-            3: 'wednesday',
-            4: 'thursday',
-            5: 'friday',
-            6: 'saturday'
-          };
-          
+          // Backend returns dayOfWeek as string (e.g., "monday") or weekday as number (0-6)
+          // Handle both cases for compatibility
           hours.forEach((h: any) => {
-            const dayName = dayMap[h.weekday];
-            if (dayName) {
+            const dayName = h.dayOfWeek || (h.weekday !== undefined ? ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][h.weekday] : null);
+            if (dayName && hoursMap[dayName]) {
               hoursMap[dayName] = {
                 open: h.openTime || '',
                 close: h.closeTime || '',
@@ -511,7 +502,7 @@ export default function RestaurantDashboard({ onBack, restaurantId, restaurantSt
       return;
     }
 
-    const newAvailability = !(item.isAvailable !== false);
+    const newAvailability = !item.isAvailable;
     setUpdatingAvailability(item.id);
 
     try {
@@ -749,13 +740,16 @@ export default function RestaurantDashboard({ onBack, restaurantId, restaurantSt
       }
 
       // Update operating hours
+      // Include all days - closed days will have isClosed: true, open days will have times
       const hoursArray = Object.entries(operatingHours).map(([day, hours]) => ({
         restaurantId: currentRestaurantId,
         dayOfWeek: day as any,
-        openTime: hours.open || '09:00',
-        closeTime: hours.close || '17:00',
+        openTime: hours.closed ? '00:00' : (hours.open || '09:00'),
+        closeTime: hours.closed ? '00:00' : (hours.close || '17:00'),
         isClosed: hours.closed || false,
       }));
+      
+      console.log('📤 Sending hours array to backend:', hoursArray);
 
       const hoursResponse = await fetch(`${API_BASE_URL}/restaurants/${currentRestaurantId}/hours`, {
         method: 'PUT',
@@ -766,7 +760,8 @@ export default function RestaurantDashboard({ onBack, restaurantId, restaurantSt
       });
 
       if (!hoursResponse.ok) {
-        throw new Error('Failed to update operating hours');
+        const errorData = await hoursResponse.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to update operating hours');
       }
 
       // Refresh restaurant data
@@ -786,6 +781,40 @@ export default function RestaurantDashboard({ onBack, restaurantId, restaurantSt
           imageFile: null,
           imagePreview: restaurantData.restaurant?.pictureUrl || null,
         });
+      }
+
+      // Refresh operating hours to show updated values
+      const refreshedHoursResponse = await fetch(`${API_BASE_URL}/restaurants/${currentRestaurantId}/hours`);
+      if (refreshedHoursResponse.ok) {
+        const refreshedHoursData = await refreshedHoursResponse.json();
+        const refreshedHours = refreshedHoursData.hours || [];
+        
+        // Map database hours to component state
+        const hoursMap: any = {
+          monday: { open: '', close: '', closed: true },
+          tuesday: { open: '', close: '', closed: true },
+          wednesday: { open: '', close: '', closed: true },
+          thursday: { open: '', close: '', closed: true },
+          friday: { open: '', close: '', closed: true },
+          saturday: { open: '', close: '', closed: true },
+          sunday: { open: '', close: '', closed: true }
+        };
+        
+        // Backend returns dayOfWeek as string (e.g., "monday") or weekday as number (0-6)
+        // Handle both cases for compatibility
+        refreshedHours.forEach((h: any) => {
+          const dayName = h.dayOfWeek || (h.weekday !== undefined ? ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][h.weekday] : null);
+          if (dayName && hoursMap[dayName]) {
+            hoursMap[dayName] = {
+              open: h.openTime || '',
+              close: h.closeTime || '',
+              closed: h.isClosed || false
+            };
+          }
+        });
+        
+        setOperatingHours(hoursMap);
+        console.log('✅ Refreshed operating hours after save:', hoursMap);
       }
 
       // Show success message

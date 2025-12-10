@@ -92,9 +92,9 @@ export class OrderService {
       // For now, we'll create customer with minimal info
       const customer = await db.createCustomer({
         fullName: data.customer.fullName || data.customer.email.split('@')[0],
-        creditNum: null, // Payment info not stored for security
-        creditExp: null,
-        creditCcv: null,
+        creditNum: undefined, // Payment info not stored for security
+        creditExp: undefined,
+        creditCcv: undefined,
         addressId: addressId,
       });
       customerCode = customer.uniqueCustomerCode;
