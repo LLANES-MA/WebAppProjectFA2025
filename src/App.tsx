@@ -49,6 +49,8 @@ export default function App() {
   const [pendingRegistrations, setPendingRegistrations] = useState<any[]>([]);
   const [approvedRestaurants, setApprovedRestaurants] = useState<any[]>([]);
   const [currentRegistration, setCurrentRegistration] = useState<any>(null);
+  const [accountData, setAccountData] = useState<{ email: string; password: string } | null>(null);
+  const [restaurantLoginData, setRestaurantLoginData] = useState<{ restaurantId: number; restaurantStatus: string; restaurantName: string } | null>(null);
 
   // Safe component renderer
   const renderComponent = (Component: React.ComponentType<any> | undefined, props: any) => {
@@ -137,10 +139,37 @@ export default function App() {
     }
   };
 
-  const handleRejectRestaurant = (registrationId: number) => {
-    setPendingRegistrations(prev => 
-      prev.filter(reg => reg.id !== registrationId)
-    );
+  const handleRejectRestaurant = async (registrationId: number) => {
+    if (!confirm(`Are you sure you want to reject restaurant registration #${registrationId}?`)) {
+      return;
+    }
+
+    try {
+      const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8080/api';
+      const response = await fetch(`${API_BASE_URL}/admin/restaurants/${registrationId}/reject`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        alert(data.error || 'Failed to reject restaurant');
+        return;
+      }
+
+      // Remove from pending registrations after successful backend rejection
+      setPendingRegistrations(prev => 
+        prev.filter(reg => reg.id !== registrationId)
+      );
+      
+      alert('Restaurant has been rejected successfully');
+    } catch (err: any) {
+      console.error('Error rejecting restaurant:', err);
+      alert('Failed to reject restaurant: ' + err.message);
+    }
   };
 
   return (
@@ -155,12 +184,12 @@ export default function App() {
           setCurrentScreen('all-restaurants');
         },
         onRestaurantSelect: handleRestaurantSelect,
-        onRestaurantSignup: () => setCurrentScreen('restaurant-registration'),
+        onRestaurantSignup: () => setCurrentScreen('restaurant-signin'),
         onGoToAccount: () => setCurrentScreen('account'),
         onGoToSettings: () => setCurrentScreen('settings'),
         onGoToSignIn: () => setCurrentScreen('signin'),
         onViewCart: () => setCurrentScreen('cart'),
-        onGoToRestaurantDashboard: () => setCurrentScreen('restaurant-dashboard'),
+        onGoToRestaurantDashboard: () => setCurrentScreen('restaurant-signin'),
         deliveryAddress,
         onDeliveryAddressChange: setDeliveryAddress
       })}
@@ -177,7 +206,7 @@ export default function App() {
         onBack: () => setCurrentScreen('homepage'),
         onRestaurantSelect: handleRestaurantSelect,
         searchQuery: searchQuery,
-        onRestaurantSignup: () => setCurrentScreen('restaurant-registration'),
+        onRestaurantSignup: () => setCurrentScreen('restaurant-signin'),
         onViewCart: () => setCurrentScreen('cart'),
         onGoToAccount: () => setCurrentScreen('account'),
         onGoToSettings: () => setCurrentScreen('settings'),
@@ -190,7 +219,7 @@ export default function App() {
         restaurant: selectedRestaurant,
         onBack: () => setCurrentScreen('all-restaurants'),
         onViewCart: handleViewCart,
-        onRestaurantSignup: () => setCurrentScreen('restaurant-registration'),
+        onRestaurantSignup: () => setCurrentScreen('restaurant-signin'),
         onViewAllRestaurants: () => setCurrentScreen('all-restaurants'),
         onGoToAccount: () => setCurrentScreen('account'),
         onGoToSettings: () => setCurrentScreen('settings'),
@@ -203,7 +232,7 @@ export default function App() {
         cartItems: cartItems,
         onBack: handleContinueShopping,
         onProceedToCheckout: handleProceedToCheckout,
-        onRestaurantSignup: () => setCurrentScreen('restaurant-registration'),
+        onRestaurantSignup: () => setCurrentScreen('restaurant-signin'),
         onViewAllRestaurants: () => setCurrentScreen('all-restaurants'),
         onGoToAccount: () => setCurrentScreen('account'),
         onGoToSettings: () => setCurrentScreen('settings'),
@@ -215,9 +244,10 @@ export default function App() {
       {currentScreen === 'checkout' && renderComponent(Checkout, {
         cartItems: cartItems,
         total: orderTotal,
+        selectedRestaurant: selectedRestaurant,
         onBack: () => setCurrentScreen('cart'),
         onOrderComplete: () => setCurrentScreen('order-confirmation'),
-        onRestaurantSignup: () => setCurrentScreen('restaurant-registration'),
+        onRestaurantSignup: () => setCurrentScreen('restaurant-signin'),
         onViewAllRestaurants: () => setCurrentScreen('all-restaurants'),
         onGoToAccount: () => setCurrentScreen('account'),
         onGoToSettings: () => setCurrentScreen('settings'),
@@ -245,8 +275,15 @@ export default function App() {
       })}
       
       {currentScreen === 'restaurant-registration' && renderComponent(RestaurantRegistration, {
-        onComplete: handleRestaurantRegistrationComplete,
-        onBack: () => setCurrentScreen('homepage')
+        onComplete: (registrationData) => {
+          handleRestaurantRegistrationComplete(registrationData);
+          setAccountData(null); // Clear account data after submission
+        },
+        onBack: () => {
+          setAccountData(null);
+          setCurrentScreen('homepage');
+        },
+        initialAccountData: accountData || undefined
       })}
       
       {currentScreen === 'registration-pending' && renderComponent(RegistrationPending, {
@@ -255,7 +292,13 @@ export default function App() {
       })}
       
       {currentScreen === 'restaurant-dashboard' && renderComponent(RestaurantDashboard, {
-        onBack: () => setCurrentScreen('homepage')
+        onBack: () => {
+          setRestaurantLoginData(null);
+          setCurrentScreen('homepage');
+        },
+        restaurantId: restaurantLoginData?.restaurantId,
+        restaurantStatus: restaurantLoginData?.restaurantStatus,
+        restaurantName: restaurantLoginData?.restaurantName
       })}
       
       {currentScreen === 'admin' && renderComponent(AdminDashboard, {
@@ -271,7 +314,7 @@ export default function App() {
       
       {currentScreen === 'account' && renderComponent(Account, {
         onBack: () => setCurrentScreen('homepage'),
-        onRestaurantSignup: () => setCurrentScreen('restaurant-registration'),
+        onRestaurantSignup: () => setCurrentScreen('restaurant-signin'),
         onViewAllRestaurants: () => setCurrentScreen('all-restaurants'),
         onViewCart: () => setCurrentScreen('cart'),
         onGoToSettings: () => setCurrentScreen('settings'),
@@ -280,7 +323,7 @@ export default function App() {
       
       {currentScreen === 'settings' && renderComponent(Settings, {
         onBack: () => setCurrentScreen('homepage'),
-        onRestaurantSignup: () => setCurrentScreen('restaurant-registration'),
+        onRestaurantSignup: () => setCurrentScreen('restaurant-signin'),
         onViewAllRestaurants: () => setCurrentScreen('all-restaurants'),
         onViewCart: () => setCurrentScreen('cart'),
         onGoToAccount: () => setCurrentScreen('account'),
@@ -292,7 +335,7 @@ export default function App() {
         onSignInSuccess: (userType: string) => setCurrentScreen('homepage'),
         onGoToAdminSignIn: () => setCurrentScreen('admin'),
         onGoToStaffSignIn: () => setCurrentScreen('staff'),
-        onGoToRestaurantSignIn: () => setCurrentScreen('restaurant-dashboard')
+        onGoToRestaurantSignIn: () => setCurrentScreen('restaurant-signin')
       })}
 
       {currentScreen === 'admin-signin' && renderComponent(AdminSignIn, {
@@ -306,8 +349,20 @@ export default function App() {
       })}
 
       {currentScreen === 'restaurant-signin' && renderComponent(RestaurantSignIn, {
-        onBack: () => setCurrentScreen('signin'),
-        onSignInSuccess: () => setCurrentScreen('restaurant-dashboard')
+        onBack: () => {
+          setCurrentScreen('signin');
+          setAccountData(null);
+        },
+        onSignInSuccess: (restaurantData) => {
+          if (restaurantData) {
+            setRestaurantLoginData(restaurantData);
+          }
+          setCurrentScreen('restaurant-dashboard');
+        },
+        onAccountCreated: (data) => {
+          setAccountData(data);
+          setCurrentScreen('restaurant-registration');
+        }
       })}
 
     </div>

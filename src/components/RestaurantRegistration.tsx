@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
@@ -22,10 +22,12 @@ import {
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Checkbox } from './ui/checkbox';
+import { Label } from './ui/label';
 
 interface RestaurantRegistrationProps {
   onComplete: (registrationData: any) => void;
   onBack: () => void;
+  initialAccountData?: { email: string; password: string };
 }
 
 const steps = [
@@ -45,8 +47,9 @@ const usStates = [
   'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'
 ];
 
-export default function RestaurantRegistration({ onComplete, onBack }: RestaurantRegistrationProps) {
+export default function RestaurantRegistration({ onComplete, onBack, initialAccountData }: RestaurantRegistrationProps) {
   const [currentStep, setCurrentStep] = useState(1);
+  const [accountPassword, setAccountPassword] = useState<string>(initialAccountData?.password || '');
   const [formData, setFormData] = useState<{
     restaurantName: string;
     description: string;
@@ -57,6 +60,7 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
     state: string;
     zipCode: string;
     phone: string;
+    contactPerson: string;
     email: string;
     website: string;
     averagePrice: string;
@@ -82,7 +86,8 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
     state: '',
     zipCode: '',
     phone: '',
-    email: '',
+    contactPerson: '',
+    email: initialAccountData?.email || '',
     website: '',
     averagePrice: '',
     deliveryFee: '',
@@ -104,7 +109,7 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
   const [errors, setErrors] = useState<{ [key: string]: any }>({});
 
   const [menuItems, setMenuItems] = useState([
-    { name: '', description: '', price: '', category: '', image: null }
+    { name: '', description: '', price: '', category: '', image: null, imageFile: null as File | null, imageUrl: null as string | null }
   ]);
 
   const [customCuisine, setCustomCuisine] = useState('');
@@ -115,8 +120,16 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  // Update email and password when initialAccountData is provided
+  useEffect(() => {
+    if (initialAccountData) {
+      setFormData(prev => ({ ...prev, email: initialAccountData.email }));
+      setAccountPassword(initialAccountData.password);
+    }
+  }, [initialAccountData]);
+
   const addMenuItem = () => {
-    setMenuItems(prev => [...prev, { name: '', description: '', price: '', category: '', image: null }]);
+    setMenuItems(prev => [...prev, { name: '', description: '', price: '', category: '', image: null, imageFile: null, imageUrl: null }]);
   };
 
   const removeMenuItem = (index: number) => {
@@ -127,6 +140,66 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
     setMenuItems(prev => prev.map((item, i) =>
       i === index ? { ...item, [field]: value } : item
     ));
+  };
+
+  const handleImageUpload = async (index: number, file: File | null) => {
+    if (!file) {
+      setMenuItems(prev => prev.map((item, i) =>
+        i === index ? { ...item, image: null, imageFile: null, imageUrl: null } : item
+      ));
+      return;
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select a valid image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image size must be less than 5MB');
+      return;
+    }
+
+    // Create preview URL for immediate display
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setMenuItems(prev => prev.map((item, i) =>
+        i === index ? { ...item, image: reader.result as string, imageFile: file } : item
+      ));
+    };
+    reader.readAsDataURL(file);
+
+    // Upload image to backend and get URL
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const response = await fetch(`${API_BASE_URL}/restaurants/upload-image`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to upload image');
+      }
+
+      // Update menu item with the image URL from backend
+      setMenuItems(prev => prev.map((item, i) =>
+        i === index ? { ...item, imageUrl: data.imageUrl } : item
+      ));
+    } catch (error: any) {
+      console.error('Error uploading image:', error);
+      alert('Failed to upload image. Please try again.');
+      // Remove the preview if upload failed
+      setMenuItems(prev => prev.map((item, i) =>
+        i === index ? { ...item, image: null, imageFile: null } : item
+      ));
+    }
   };
 
   const validateStep = () => {
@@ -155,11 +228,23 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
         newErrors.zipCode = 'ZIP code must be 5 digits';
       }
 
-      // Phone validation (10 digits)
+      // Contact person validation
+      if (!formData.contactPerson || !formData.contactPerson.trim()) {
+        newErrors.contactPerson = 'Contact person is required';
+      } else if (formData.contactPerson.trim().length < 2) {
+        newErrors.contactPerson = 'Contact person name must be at least 2 characters';
+      }
+
+      // Phone validation (10 digits, first digit cannot be 0)
       if (!formData.phone) {
         newErrors.phone = 'Phone number is required';
-      } else if (!/^\d{10}$/.test(formData.phone.replace(/\D/g, ''))) {
-        newErrors.phone = 'Enter a valid 10-digit phone number';
+      } else {
+        const phoneDigits = formData.phone.replace(/\D/g, '');
+        if (phoneDigits.length !== 10) {
+          newErrors.phone = 'Phone number must be exactly 10 digits';
+        } else if (phoneDigits[0] === '0') {
+          newErrors.phone = 'Phone number cannot start with 0';
+        }
       }
 
       // Email validation
@@ -404,6 +489,18 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
 
               <Separator className="bg-white/10" />
 
+              <div>
+                <label className="block text-sm font-medium mb-2">Contact Person *</label>
+                <Input
+                  placeholder="John Doe"
+                  value={formData.contactPerson}
+                  onChange={(e) => updateFormData('contactPerson', e.target.value)}
+                  className={`bg-card/50 border-white/10 ${errors.contactPerson ? 'border-destructive' : ''}`}
+                />
+                {errors.contactPerson && <p className="text-xs text-destructive mt-1">{errors.contactPerson}</p>}
+                <p className="text-xs text-muted-foreground mt-1">This person will be contacted for questions, concerns, and inquiries</p>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">Phone Number *</label>
@@ -551,7 +648,7 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
 
                 <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
                   <p className="text-sm text-blue-400">
-                    💡 Tip: Set accurate hours so customers know when they can order from you. You can always update these later in your dashboard.
+                    Set accurate hours so customers know when they can order from you. You can update these later in your dashboard.
                   </p>
                 </div>
                 {errors.operatingHours && (
@@ -679,6 +776,73 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
                         {errors.menuItems && errors.menuItems[index]?.description && (
                           <p className="text-xs text-destructive mt-1">{errors.menuItems[index].description}</p>
                         )}
+                      </div>
+
+                      <div className="mt-4">
+                        <Label className="text-sm font-medium mb-2 block">Category</Label>
+                        <Input
+                          placeholder="e.g., Appetizers, Main Course, Desserts"
+                          value={item.category}
+                          onChange={(e) => updateMenuItem(index, 'category', e.target.value)}
+                          className="bg-background/50 border-white/10"
+                        />
+                      </div>
+
+                      <div className="mt-4">
+                        <Label className="text-sm font-medium mb-2 block">Item Image</Label>
+                        <div className="flex items-center gap-4">
+                          {(item.image || item.imageUrl) ? (
+                            <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-white/20">
+                              <img
+                                src={item.imageUrl || item.image}
+                                alt={item.name || 'Menu item'}
+                                className="w-full h-full object-cover"
+                              />
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="sm"
+                                className="absolute top-1 right-1 h-6 w-6 p-0"
+                                onClick={() => handleImageUpload(index, null)}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="w-32 h-32 rounded-lg border-2 border-dashed border-white/20 flex items-center justify-center bg-background/30">
+                              <Camera className="h-8 w-8 text-muted-foreground" />
+                            </div>
+                          )}
+                          <div className="flex-1">
+                            <Input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0] || null;
+                                handleImageUpload(index, file);
+                              }}
+                              className="hidden"
+                              id={`menu-item-image-${index}`}
+                            />
+                            <Label
+                              htmlFor={`menu-item-image-${index}`}
+                              className="cursor-pointer"
+                            >
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="w-full"
+                                onClick={() => document.getElementById(`menu-item-image-${index}`)?.click()}
+                              >
+                                <Upload className="h-4 w-4 mr-2" />
+                                {item.image ? 'Change Image' : 'Upload Image'}
+                              </Button>
+                            </Label>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              JPG, PNG, or GIF (max 5MB)
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -863,7 +1027,26 @@ export default function RestaurantRegistration({ onComplete, onBack }: Restauran
             {currentStep === steps.length ? (
               <Button
                 onClick={() => {
-                  if (validateStep()) onComplete(formData);
+                  if (validateStep()) {
+                    // Prepare complete registration data including menu items and account password
+                    const registrationData = {
+                      ...formData,
+                      cuisineType: Array.isArray(formData.cuisineType) 
+                        ? formData.cuisineType.join(', ') 
+                        : formData.cuisineType,
+                      menuItems: menuItems
+                        .filter(item => item.name && item.price && item.description)
+                        .map(item => ({
+                          name: item.name,
+                          description: item.description,
+                          price: item.price,
+                          category: item.category,
+                          imageUrl: item.imageUrl || undefined // Include image URL from backend
+                        })),
+                      password: accountPassword // Include password from account creation
+                    };
+                    onComplete(registrationData);
+                  }
                 }}
                 className="bg-primary hover:bg-primary/80"
               >

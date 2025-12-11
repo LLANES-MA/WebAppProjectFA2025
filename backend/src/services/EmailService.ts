@@ -23,7 +23,7 @@ export class EmailService {
 
     // Only initialize if email configuration is provided
     if (emailHost && emailPort && emailUser && emailPass) {
-      this.transporter = nodemailer.createTransporter({
+      this.transporter = nodemailer.createTransport({
         host: emailHost,
         port: parseInt(emailPort),
         secure: false, // true for 465, false for other ports
@@ -34,9 +34,9 @@ export class EmailService {
       });
 
       this.enabled = true;
-      console.log('✅ Email service initialized');
+      console.log('Email service initialized');
     } else {
-      console.warn('⚠️  Email service not configured. Emails will be logged to console only.');
+      console.warn('Email service not configured. Emails will be logged to console only.');
       this.enabled = false;
     }
   }
@@ -46,8 +46,7 @@ export class EmailService {
    */
   async sendEmail(options: EmailOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
     if (!this.enabled || !this.transporter) {
-      // Log email to console in development mode
-      console.log('📧 Email (dev mode):', {
+      console.log('Email (dev mode):', {
         to: options.to,
         subject: options.subject,
         body: options.body.substring(0, 100) + '...',
@@ -69,14 +68,14 @@ export class EmailService {
       };
 
       const info = await this.transporter.sendMail(mailOptions);
-      console.log('✅ Email sent successfully:', info.messageId);
+      console.log('Email sent successfully:', info.messageId);
       
       return {
         success: true,
         messageId: info.messageId,
       };
     } catch (error: any) {
-      console.error('❌ Failed to send email:', error);
+      console.error('Failed to send email:', error);
       return {
         success: false,
         error: error.message || 'Failed to send email',
@@ -158,6 +157,42 @@ If you have any questions or need assistance, please contact our support team:
 - Phone: 1-800-FRONTDASH
 
 We're excited to have you on board!
+
+Best regards,
+The FrontDash Team
+    `.trim();
+
+    await this.sendEmail({
+      to: email,
+      subject,
+      body,
+    });
+  }
+
+  /**
+   * Send rejection email to restaurant
+   */
+  async sendRejectionEmail(email: string, restaurantName: string): Promise<void> {
+    const subject = 'Update on your FrontDash restaurant registration';
+    const body = `
+Dear ${restaurantName},
+
+Thank you for your interest in joining FrontDash.
+
+After careful review of your restaurant registration application, we regret to inform you that we are unable to approve your restaurant for our platform at this time.
+
+This decision may have been based on various factors including:
+- Business information verification
+- Platform capacity and market fit
+- Current operational requirements
+
+We understand this may be disappointing, and we appreciate the time you took to complete the registration process.
+
+If you believe this decision was made in error or if you have additional information you'd like to share, please feel free to contact our support team:
+- Email: support@frontdash.com
+- Phone: 1-800-FRONTDASH
+
+We wish you the best of luck with your restaurant business.
 
 Best regards,
 The FrontDash Team

@@ -27,9 +27,9 @@ export class AdminService {
    * - Sends approval email with credentials
    */
   async approveRestaurant(restaurantId: number): Promise<ApprovalResult> {
-    // Get restaurant
-    const restaurant = restaurantService.getRestaurant(restaurantId);
+    const restaurant = await restaurantService.getRestaurant(restaurantId);
     if (!restaurant) {
+      console.error(`Restaurant with ID ${restaurantId} not found`);
       return {
         success: false,
         restaurantId,
@@ -39,8 +39,8 @@ export class AdminService {
       };
     }
 
-    // Check if already approved
     if (restaurant.status === 'approved') {
+      console.warn(`Restaurant ${restaurantId} is already approved`);
       return {
         success: false,
         restaurantId,
@@ -51,27 +51,64 @@ export class AdminService {
     }
 
     try {
-      // Generate temporary password
       const temporaryPassword = authService.generateTemporaryPassword();
-      const username = restaurant.email; // Use email as username
+      const username = restaurant.email;
 
-      // Create login via AuthService
-      await authService.createLogin(username, temporaryPassword);
+      if (!username || !restaurant.email) {
+        return {
+          success: false,
+          restaurantId,
+          username: '',
+          temporaryPassword: '',
+          error: 'Restaurant email is required for login',
+        };
+      }
 
-      // Create RestaurantAccount linking Restaurant to Login
-      const accountInput: RestaurantAccountCreateInput = {
-        restaurantId: restaurant.id,
-        username: username,
-      };
-      db.createRestaurantAccount(accountInput);
+      // Ensure Restaurant table has email field set (in case it's missing)
+      // This ensures the restaurant can login using their email
+      if (restaurant.email) {
+        await db.updateRestaurant(restaurantId, {
+          email: restaurant.email,
+        });
+      }
 
-      // Update restaurant status to approved
-      restaurantService.updateRestaurant(restaurantId, {
-        status: 'approved',
-        approvedAt: new Date(),
-      });
+      try {
+        await authService.createLogin(username, temporaryPassword, 'restaurant');
+      } catch (error: any) {
+        if (error.message && error.message.includes('already exists')) {
+          const existingLogin = await db.getLogin(username);
+          if (existingLogin) {
+            const testAuth = await authService.authenticate(username, temporaryPassword);
+            if (!testAuth) {
+              console.warn(`Existing login password does not match temporary password`);
+            }
+          }
+        } else {
+          throw new Error(`Failed to create login: ${error.message || error}`);
+        }
+      }
 
-      // Send approval email with credentials
+      try {
+        const accountInput: RestaurantAccountCreateInput = {
+          restaurantId: restaurant.id,
+          username: username,
+        };
+        await db.createRestaurantAccount(accountInput);
+      } catch (error: any) {
+        if (error.message && (error.message.includes('already exists') || error.message.includes('Duplicate'))) {
+          // Account already exists, continue
+        } else {
+          throw new Error(`Failed to create restaurant account: ${error.message || error}`);
+        }
+      }
+
+      try {
+        await db.updateRestaurantStatus(restaurantId, 'APPROVED', true);
+      } catch (error: any) {
+        console.error(`Failed to update restaurant status:`, error);
+        throw new Error(`Failed to update restaurant status: ${error.message || error}`);
+      }
+
       const loginUrl = process.env.FRONTEND_URL || 'http://localhost:3000/restaurant-signin';
       try {
         await emailService.sendApprovalEmail(
@@ -81,10 +118,8 @@ export class AdminService {
           temporaryPassword,
           loginUrl
         );
-        console.log(`✅ Approval email sent to ${restaurant.email}`);
       } catch (error) {
-        console.error(`❌ Failed to send approval email:`, error);
-        // Don't fail approval if email fails
+        console.error(`Failed to send approval email:`, error);
       }
 
       return {
@@ -94,7 +129,7 @@ export class AdminService {
         temporaryPassword,
       };
     } catch (error: any) {
-      console.error(`❌ Failed to approve restaurant ${restaurantId}:`, error);
+      console.error(`Failed to approve restaurant ${restaurantId}:`, error);
       return {
         success: false,
         restaurantId,
@@ -105,18 +140,21 @@ export class AdminService {
     }
   }
 
-  /**
-   * Reject a restaurant registration
-   */
-  rejectRestaurant(restaurantId: number): boolean {
-    const restaurant = restaurantService.getRestaurant(restaurantId);
+  async rejectRestaurant(restaurantId: number): Promise<boolean> {
+    const restaurant = await restaurantService.getRestaurant(restaurantId);
     if (!restaurant) {
       return false;
     }
 
-    restaurantService.updateRestaurant(restaurantId, {
+    await restaurantService.updateRestaurant(restaurantId, {
       status: 'rejected',
     });
+
+    try {
+      await emailService.sendRejectionEmail(restaurant.email, restaurant.restaurantName);
+    } catch (error: any) {
+      console.error(`Failed to send rejection email:`, error?.message || error);
+    }
 
     return true;
   }
@@ -124,15 +162,53 @@ export class AdminService {
   /**
    * Get all pending restaurant registrations
    */
-  getPendingRestaurants(): Restaurant[] {
-    return restaurantService.getRestaurantsByStatus('pending');
+  async getPendingRestaurants(): Promise<Restaurant[]> {
+    return await restaurantService.getRestaurantsByStatus('pending');
   }
 
   /**
    * Get all approved restaurants
    */
-  getApprovedRestaurants(): Restaurant[] {
-    return restaurantService.getRestaurantsByStatus('approved');
+  async getApprovedRestaurants(): Promise<Restaurant[]> {
+    return await restaurantService.getRestaurantsByStatus('approved');
+  }
+
+  /**
+   * Get all pending withdrawal requests
+   * These are restaurants with request_status='WITHDRAWAL' and is_active=1
+   */
+  async getPendingWithdrawals(): Promise<Restaurant[]> {
+    return await db.getPendingWithdrawals();
+  }
+
+  /**
+   * Approve a withdrawal request
+   * Sets restaurant status to 'WITHDRAWAL' and is_active = 0
+   */
+  async approveWithdrawal(restaurantId: number): Promise<boolean> {
+    const restaurant = await restaurantService.getRestaurant(restaurantId);
+    if (!restaurant) {
+      return false;
+    }
+
+    // Set status to WITHDRAWAL and deactivate
+    await db.updateRestaurantStatus(restaurantId, 'WITHDRAWAL', false);
+    return true;
+  }
+
+  /**
+   * Reject a withdrawal request
+   * Reverts restaurant back to approved status
+   */
+  async rejectWithdrawal(restaurantId: number): Promise<boolean> {
+    const restaurant = await restaurantService.getRestaurant(restaurantId);
+    if (!restaurant) {
+      return false;
+    }
+
+    // Revert back to approved status
+    await db.updateRestaurantStatus(restaurantId, 'APPROVED', true);
+    return true;
   }
 }
 

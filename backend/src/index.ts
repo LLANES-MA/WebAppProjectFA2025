@@ -27,6 +27,10 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Serve uploaded images statically
+import path from 'path';
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
 // Request logging middleware
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
@@ -64,10 +68,10 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`\n🎉 FrontDash Backend API Server running!`);
-  console.log(`📍 Server: http://localhost:${PORT}`);
-  console.log(`📡 API Base: http://localhost:${PORT}/api`);
-  console.log(`🌐 CORS Origin: ${CORS_ORIGIN}`);
-  console.log(`📧 Email Service: ${process.env.EMAIL_USER ? '✅ Configured' : '⚠️  Not configured (dev mode)'}\n`);
+  console.log(`\nFrontDash Backend API Server running!`);
+  console.log(`Server: http://localhost:${PORT}`);
+  console.log(`API Base: http://localhost:${PORT}/api`);
+  console.log(`CORS Origin: ${CORS_ORIGIN}`);
+  console.log(`Email Service: ${process.env.EMAIL_USER ? 'Configured' : 'Not configured (dev mode)'}\n`);
 });
 
