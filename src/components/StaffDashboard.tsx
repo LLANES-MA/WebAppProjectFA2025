@@ -123,12 +123,12 @@ export default function StaffDashboard({ onBack }: StaffDashboardProps) {
         const healthUrl = API_BASE_URL.replace('/api', '/health');
         const response = await fetch(healthUrl);
         if (response.ok) {
-          console.log('✅ Backend connection successful');
+          console.log('Backend connection successful');
         } else {
-          console.warn('⚠️ Backend health check failed');
+          console.warn('Backend health check failed');
         }
       } catch (err) {
-        console.error('❌ Backend connection failed:', err);
+        console.error('Backend connection failed:', err);
         setError('Cannot connect to backend server. Please ensure it is running on port 8080.');
       }
     };

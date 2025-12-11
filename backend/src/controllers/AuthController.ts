@@ -14,10 +14,8 @@ export class AuthController {
   async restaurantLogin(req: Request, res: Response): Promise<void> {
     try {
       const { username, password } = req.body;
-      console.log(`🔐 Restaurant login attempt for username: ${username}`);
 
       if (!username || !password) {
-        console.error('❌ Missing username or password');
         res.status(400).json({
           success: false,
           error: 'Username and password are required',
@@ -25,16 +23,8 @@ export class AuthController {
         return;
       }
 
-      // Authenticate using AuthService
-      console.log(`🔍 Authenticating username: ${username}...`);
-      console.log(`🔍 Password provided (length: ${password.length})`);
-      
-      // First check if login exists
       const loginCheck = await frontDashMain.db.getLogin(username);
       if (!loginCheck) {
-        console.error(`❌ Login not found in database for username: ${username}`);
-        // Try case-insensitive search
-        console.log(`🔍 Attempting to find login with different case...`);
         res.status(401).json({
           success: false,
           error: `Login not found. Please verify your email address is correct.`,
@@ -42,17 +32,9 @@ export class AuthController {
         return;
       }
       
-      console.log(`✅ Login exists in database`);
-      console.log(`🔐 Stored hash type: ${loginCheck.passwordHash.startsWith('$2') ? 'bcrypt' : 'plain text'}`);
-      
       const isValid = await frontDashMain.authService.authenticate(username, password);
 
       if (!isValid) {
-        console.error(`❌ Authentication failed for username: ${username}`);
-        console.error(`💡 Possible issues:`);
-        console.error(`   - Password does not match stored hash`);
-        console.error(`   - Username case mismatch (try: ${username.toLowerCase()} or ${username.toUpperCase()})`);
-        console.error(`   - Password may have been changed`);
         res.status(401).json({
           success: false,
           error: 'Invalid username or password. Please check your credentials and try again.',
@@ -60,14 +42,9 @@ export class AuthController {
         return;
       }
 
-      console.log(`✅ Authentication successful for username: ${username}`);
-
-      // Check if this username is linked to a restaurant account
-      console.log(`🔍 Checking RestaurantAccount for username: ${username}...`);
       const restaurantAccount = await frontDashMain.db.getRestaurantAccountByUsername(username);
       
       if (!restaurantAccount) {
-        console.error(`❌ No RestaurantAccount found for username: ${username}`);
         res.status(403).json({
           success: false,
           error: 'This account is not associated with a restaurant. Please contact support.',
@@ -75,22 +52,15 @@ export class AuthController {
         return;
       }
 
-      console.log(`✅ RestaurantAccount found: restaurantId=${restaurantAccount.restaurantId}`);
-
-      // Get restaurant details including status
-      console.log(`🔍 Fetching restaurant details for ID: ${restaurantAccount.restaurantId}...`);
       const restaurant = await frontDashMain.db.getRestaurant(restaurantAccount.restaurantId);
       
       if (!restaurant) {
-        console.error(`❌ Restaurant not found for ID: ${restaurantAccount.restaurantId}`);
         res.status(404).json({
           success: false,
           error: 'Restaurant not found',
         });
         return;
       }
-
-      console.log(`✅ Restaurant found: ${restaurant.restaurantName}, status: ${restaurant.status}`);
       
       res.json({
         success: true,
@@ -102,8 +72,7 @@ export class AuthController {
         restaurantName: restaurant?.restaurantName || '',
       });
     } catch (error: any) {
-      console.error('❌ Restaurant login error:', error);
-      console.error('Error stack:', error.stack);
+      console.error('Restaurant login error:', error);
       res.status(500).json({
         success: false,
         error: error.message || 'Authentication failed',

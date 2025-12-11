@@ -1,8 +1,3 @@
-/**
- * Database Interface Implementation
- * MySQL implementation of the database abstraction layer
- */
-
 import { pool } from './dbConnection';
 import { Restaurant, RestaurantCreateInput } from '../models/Restaurant';
 import { Login, LoginCreateInput } from '../models/Login';
@@ -17,8 +12,7 @@ import { OrderQueue, OrderQueueCreateInput } from '../models/OrderQueue';
 import { Customer, CustomerCreateInput } from '../models/Customer';
 
 class Database {
-  // ==================== Restaurant Methods ====================
-  
+
   async createRestaurant(input: RestaurantCreateInput, contactPerson?: string): Promise<Restaurant> {
     // Validate required fields
     if (!input.address) {
@@ -361,29 +355,21 @@ class Database {
   // ==================== Login Methods ====================
 
   async createLogin(input: LoginCreateInput, usertype?: string): Promise<Login> {
-    // Use Login table (capital L) which has usertype column
-    console.log(`📝 Creating login in database: username=${input.username}, hashLength=${input.passwordHash.length}`);
-    console.log(`🔐 Password hash preview: ${input.passwordHash.substring(0, 30)}...`);
-    
-    // Check if password_hash column can store full bcrypt hash (should be at least 255 chars)
     if (input.passwordHash.length > 255) {
-      console.error(`❌ ERROR: Password hash is ${input.passwordHash.length} characters, but column may only support 255!`);
+      console.error(`Password hash is ${input.passwordHash.length} characters, but column may only support 255`);
       throw new Error(`Password hash too long for database column`);
     }
     
     // Try different column names for password field
     const queries = [
-      // Try password_hash (snake_case)
       {
         query: `INSERT INTO Login (username, password_hash, usertype) VALUES (?, ?, ?)`,
         column: 'password_hash'
       },
-      // Try passwordHash (camelCase)
       {
         query: `INSERT INTO Login (username, passwordHash, usertype) VALUES (?, ?, ?)`,
         column: 'passwordHash'
       },
-      // Try password (plain)
       {
         query: `INSERT INTO Login (username, password, usertype) VALUES (?, ?, ?)`,
         column: 'password'
@@ -393,17 +379,13 @@ class Database {
     let lastError: any = null;
     for (const { query, column } of queries) {
       try {
-        console.log(`📝 Trying to insert with column: ${column}`);
         await pool.execute(query, [input.username, input.passwordHash, usertype || null]);
-        console.log(`✅ Successfully inserted using column: ${column}`);
-        break; // Success, exit loop
+        break;
       } catch (error: any) {
         lastError = error;
         if (error.code === 'ER_BAD_FIELD_ERROR' || error.message?.includes('Unknown column')) {
-          console.log(`⚠️ Column ${column} doesn't exist, trying next...`);
-          continue; // Try next column name
+          continue;
         }
-        // For other errors, throw immediately
         throw error;
       }
     }
@@ -412,22 +394,17 @@ class Database {
       throw new Error(`Failed to create login: None of the expected password columns (password_hash, passwordHash, password) exist in Login table`);
     }
     
-    // Verify the hash was stored correctly
     const login = await this.getLogin(input.username);
     if (!login) {
       throw new Error('Failed to create login');
     }
     
-    // Verify the stored hash matches what we tried to store
     if (login.passwordHash !== input.passwordHash) {
-      console.error(`❌ ERROR: Stored password hash does not match input hash!`);
-      console.error(`   Input length: ${input.passwordHash.length}, Stored length: ${login.passwordHash.length}`);
-      console.error(`   Input preview: ${input.passwordHash.substring(0, 30)}...`);
-      console.error(`   Stored preview: ${login.passwordHash.substring(0, 30)}...`);
+      console.error(`Stored password hash does not match input hash`);
+      console.error(`Input length: ${input.passwordHash.length}, Stored length: ${login.passwordHash.length}`);
       throw new Error('Password hash was corrupted during storage');
     }
     
-    console.log(`✅ Login created and verified successfully`);
     return login;
   }
 
@@ -453,40 +430,25 @@ class Database {
       try {
         [rows] = await pool.execute(query, [username]) as any[];
         if (rows.length > 0) {
-          console.log(`✅ Found login using query: ${query.substring(0, 50)}...`);
           break;
         }
       } catch (error: any) {
         if (error.code === 'ER_BAD_FIELD_ERROR' || error.message?.includes('Unknown column')) {
-          continue; // Try next query
+          continue;
         }
-        // For other errors, log and continue
-        console.log(`⚠️ Query failed: ${error.message}`);
         continue;
       }
     }
     
     if (rows.length === 0) {
-      console.log(`⚠️ No login found for username: ${username} (case-insensitive search)`);
       return undefined;
     }
     
-    console.log(`✅ Found login with username: ${rows[0].username} (matched ${username})`);
     const mapped = this.mapLogin(rows[0]);
     
-    // Debug: Check if password hash is valid
-    if (mapped.passwordHash) {
-      console.log(`🔐 Retrieved password hash length: ${mapped.passwordHash.length}`);
-      console.log(`🔐 Password hash value: "${mapped.passwordHash}"`);
-      console.log(`🔐 Password hash starts with: ${mapped.passwordHash.substring(0, 10)}`);
-      // Bcrypt hashes should be 60 characters
-      if (mapped.passwordHash.length < 60 && mapped.passwordHash.startsWith('$2')) {
-        console.error(`⚠️ WARNING: Bcrypt hash appears truncated! Expected 60 chars, got ${mapped.passwordHash.length}`);
-      }
-    } else {
-      console.error(`❌ ERROR: passwordHash is null or undefined!`);
-      console.error(`   Row keys:`, Object.keys(rows[0]));
-      console.error(`   Row data:`, rows[0]);
+    // Bcrypt hashes should be 60 characters
+    if (mapped.passwordHash && mapped.passwordHash.length < 60 && mapped.passwordHash.startsWith('$2')) {
+      console.warn(`Bcrypt hash appears truncated. Expected 60 chars, got ${mapped.passwordHash.length}`);
     }
     
     return mapped;
@@ -534,11 +496,10 @@ class Database {
   }
 
   private mapLogin(row: any): Login {
-    // Handle both passwordHash (camelCase) and password_hash (snake_case)
     const passwordHash = row.passwordHash || row.password_hash;
     
     if (!passwordHash) {
-      console.error(`❌ ERROR: No password hash found in row:`, Object.keys(row));
+      console.error(`No password hash found in row:`, Object.keys(row));
     }
     
     return {
@@ -580,8 +541,6 @@ class Database {
     
     // Skip Sunday (weekday 0) as database constraint only allows 1-6
     if (weekday === 0) {
-      console.log(`⏭️  Skipping Sunday (weekday 0) - database constraint only allows weekday 1-6`);
-      // Return a placeholder hours object for Sunday
       return {
         id: 0,
         restaurantId: input.restaurantId,
@@ -684,24 +643,19 @@ class Database {
 
   async updateRestaurantHours(restaurantId: number, hours: RestaurantHoursCreateInput[]): Promise<void> {
     try {
-      // Step 1: Check for existing records with the same restaurant_id and delete them
+      // Delete existing records before inserting new ones
       const [existingRecords] = await pool.execute(
         'SELECT hours_id FROM RestaurantHours WHERE restaurant_id = ?',
         [restaurantId]
       ) as any[];
       
       if (existingRecords.length > 0) {
-        console.log(`🗑️  Found ${existingRecords.length} existing hour records for restaurant ${restaurantId}, deleting...`);
         await pool.execute('DELETE FROM RestaurantHours WHERE restaurant_id = ?', [restaurantId]);
-        console.log(`✅ Deleted ${existingRecords.length} existing hour records`);
-      } else {
-        console.log(`ℹ️  No existing hour records found for restaurant ${restaurantId}`);
       }
       
-      // Step 2: Insert the newly inputted values from the restaurant dashboard
-      // Note: Database constraint only allows weekday 1-6 (Monday-Saturday), not 0 (Sunday)
+      // Database constraint only allows weekday 1-6 (Monday-Saturday), not 0 (Sunday)
       const dayToWeekday: { [key: string]: number } = {
-        'sunday': 0,  // Will be skipped due to constraint
+        'sunday': 0,
         'monday': 1,
         'tuesday': 2,
         'wednesday': 3,
@@ -709,8 +663,6 @@ class Database {
         'friday': 5,
         'saturday': 6,
       };
-      
-      let insertedCount = 0;
       
       for (const hour of hours) {
         const weekday = dayToWeekday[hour.dayOfWeek];
@@ -722,72 +674,50 @@ class Database {
         
         // Skip Sunday (weekday 0) as database constraint only allows 1-6
         if (weekday === 0) {
-          console.log(`⏭️  Skipping Sunday (weekday 0) - database constraint only allows weekday 1-6`);
           continue;
         }
         
-        // Handle closed days
         if (hour.isClosed) {
           try {
-            // Try with is_closed column first
             await pool.execute(
               'INSERT INTO RestaurantHours (restaurant_id, weekday, open_time, close_time, is_closed) VALUES (?, ?, ?, ?, ?)',
               [restaurantId, weekday, '00:00', '00:00', 1]
             );
-            console.log(`✅ Inserted closed hours for ${hour.dayOfWeek} (hours_id will be auto-generated)`);
-            insertedCount++;
           } catch (error: any) {
-            // If that fails, try without is_closed column
-            console.log(`⚠️  Insert with is_closed failed for closed ${hour.dayOfWeek}, trying without:`, error.message);
+            // Fallback if is_closed column doesn't exist
             try {
               await pool.execute(
                 'INSERT INTO RestaurantHours (restaurant_id, weekday, open_time, close_time) VALUES (?, ?, ?, ?)',
                 [restaurantId, weekday, '00:00', '00:00']
               );
-              console.log(`✅ Inserted closed hours (without is_closed) for ${hour.dayOfWeek}`);
-              insertedCount++;
             } catch (fallbackError: any) {
-              console.error(`❌ Both insert attempts failed for closed ${hour.dayOfWeek}:`, fallbackError.message);
               throw new Error(`Failed to insert closed hours for ${hour.dayOfWeek}: ${fallbackError.message}`);
             }
           }
         } else if (hour.openTime && hour.closeTime) {
-          // Handle open days
-          // Format times to HH:MM
           const openTime = hour.openTime.includes(':') ? hour.openTime.substring(0, 5) : `${hour.openTime}:00`;
           const closeTime = hour.closeTime.includes(':') ? hour.closeTime.substring(0, 5) : `${hour.closeTime}:00`;
           
           try {
-            // Try with is_closed column first
             await pool.execute(
               'INSERT INTO RestaurantHours (restaurant_id, weekday, open_time, close_time, is_closed) VALUES (?, ?, ?, ?, ?)',
               [restaurantId, weekday, openTime, closeTime, 0]
             );
-            console.log(`✅ Inserted open hours for ${hour.dayOfWeek}: ${openTime} - ${closeTime} (hours_id will be auto-generated)`);
-            insertedCount++;
           } catch (error: any) {
-            // If that fails, try without is_closed column
-            console.log(`⚠️  Insert with is_closed failed for ${hour.dayOfWeek}, trying without:`, error.message);
+            // Fallback if is_closed column doesn't exist
             try {
               await pool.execute(
                 'INSERT INTO RestaurantHours (restaurant_id, weekday, open_time, close_time) VALUES (?, ?, ?, ?)',
                 [restaurantId, weekday, openTime, closeTime]
               );
-              console.log(`✅ Inserted open hours (without is_closed) for ${hour.dayOfWeek}`);
-              insertedCount++;
             } catch (fallbackError: any) {
-              console.error(`❌ Both insert attempts failed for ${hour.dayOfWeek}:`, fallbackError.message);
               throw new Error(`Failed to insert hours for ${hour.dayOfWeek}: ${fallbackError.message}`);
             }
           }
-        } else {
-          console.log(`⏭️  Skipping ${hour.dayOfWeek} - missing open or close time and not marked as closed`);
         }
       }
-      
-      console.log(`✅ Successfully inserted ${insertedCount} hour records for restaurant ${restaurantId}`);
     } catch (error: any) {
-      console.error('❌ Error in updateRestaurantHours:', error);
+      console.error('Error in updateRestaurantHours:', error);
       throw new Error(`Failed to update restaurant hours: ${error.message}`);
     }
   }
@@ -850,20 +780,16 @@ class Database {
 
     for (const { query, values } of queries) {
       try {
-        console.log(`📝 Creating menu item for restaurant ${input.restaurantId}: ${input.name}`);
         const [result] = await pool.execute(query, values) as any;
         const menuItem = await this.getMenuItemById(result.insertId);
         if (menuItem) {
-          console.log(`✅ Menu item created successfully with ID: ${result.insertId}`);
           return menuItem;
         }
       } catch (error: any) {
         if (error.code === 'ER_NO_SUCH_TABLE') {
-          console.log(`⚠️ Table not found, trying next schema: ${error.message}`);
-          continue; // Try next query
+          continue;
         }
-        // For other errors, log and rethrow
-        console.error('❌ Error creating menu item:', error);
+        console.error('Error creating menu item:', error);
         throw error;
       }
     }
@@ -959,37 +885,23 @@ class Database {
       }
     ];
 
-    // Try each query until one works
     for (const { query, mapper } of queries) {
       try {
-        console.log(`🔍 Trying menu items query for restaurant ${restaurantId}...`);
         const [rows] = await pool.execute(query, [restaurantId]) as any[];
-        console.log(`✅ Query succeeded, found ${rows?.length || 0} menu items`);
         if (rows && rows.length >= 0) {
-          const mapped = rows.map(mapper);
-          console.log(`📋 Mapped ${mapped.length} menu items for restaurant ${restaurantId}`);
-          return mapped;
+          return rows.map(mapper);
         }
       } catch (error: any) {
-        // If table doesn't exist, try next query
         if (error.code === 'ER_NO_SUCH_TABLE' || error.message?.includes('doesn\'t exist')) {
-          console.log(`⚠️ Table not found, trying next schema: ${error.message}`);
           continue;
         }
-        // If column doesn't exist, try next query
         if (error.code === 'ER_BAD_FIELD_ERROR' || error.message?.includes('Unknown column')) {
-          console.log(`⚠️ Column not found, trying next schema: ${error.message}`);
           continue;
         }
-        // For other errors, log and try next
-        console.warn(`⚠️ Query failed, trying next: ${error.message}`);
-        console.warn(`   Error code: ${error.code}`);
         continue;
       }
     }
 
-    // If all queries failed, return empty array
-    console.warn(`❌ No menu items table found matching expected schemas for restaurant ${restaurantId}`);
     return [];
   }
 

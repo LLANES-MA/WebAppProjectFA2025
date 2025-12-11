@@ -52,13 +52,7 @@ export class RestaurantController {
   async register(req: Request, res: Response): Promise<void> {
     try {
       const registrationData = req.body;
-      console.log('📝 Registration request received:', {
-        restaurantName: registrationData.restaurantName,
-        email: registrationData.email,
-        hasOperatingHours: !!registrationData.operatingHours,
-      });
       
-      // Validate required fields
       if (!registrationData.restaurantName || !registrationData.email) {
         res.status(400).json({
           success: false,
@@ -68,7 +62,6 @@ export class RestaurantController {
       }
 
       const restaurant = await restaurantService.registerRestaurant(registrationData);
-      console.log('✅ Restaurant created successfully:', restaurant.id);
 
       res.status(201).json({
         success: true,
@@ -76,8 +69,7 @@ export class RestaurantController {
         message: 'Registration successful',
       });
     } catch (error: any) {
-      console.error('❌ Registration error:', error);
-      console.error('Error stack:', error.stack);
+      console.error('Registration error:', error);
       res.status(500).json({
         success: false,
         error: error.message || 'Failed to register restaurant',
@@ -161,16 +153,14 @@ export class RestaurantController {
   async getMenu(req: Request, res: Response): Promise<void> {
     try {
       const id = parseInt(req.params.id);
-      console.log(`📡 Fetching menu items for restaurant ID: ${id}`);
       const menuItems = await restaurantService.getMenuItems(id);
-      console.log(`✅ Found ${menuItems.length} menu items for restaurant ${id}`);
 
       res.json({
         success: true,
         menuItems,
       });
     } catch (error: any) {
-      console.error('❌ Error fetching menu items:', error);
+      console.error('Error fetching menu items:', error);
       res.status(500).json({
         success: false,
         error: error.message || 'Failed to fetch menu items',
@@ -196,26 +186,22 @@ export class RestaurantController {
         return;
       }
 
-      console.log(`📝 Creating menu item for restaurant ${restaurantId}:`, { name, price });
-
       const menuItem = await restaurantService.createMenuItem({
         restaurantId,
         name,
         description: description || '',
         price: parseFloat(price),
-        category: 'Other', // Default category
+        category: 'Other',
         imageUrl: pictureUrl || undefined,
         isAvailable: isAvailable !== false,
       });
-
-      console.log(`✅ Menu item created successfully: ${menuItem.id}`);
 
       res.status(201).json({
         success: true,
         menuItem,
       });
     } catch (error: any) {
-      console.error('❌ Error creating menu item:', error);
+      console.error('Error creating menu item:', error);
       res.status(500).json({
         success: false,
         error: error.message || 'Failed to create menu item',
@@ -233,8 +219,6 @@ export class RestaurantController {
       const itemId = parseInt(req.params.itemId);
       const { name, description, price, isAvailable, pictureUrl } = req.body;
 
-      console.log(`📝 Updating menu item ${itemId} for restaurant ${restaurantId}`);
-
       const menuItem = await restaurantService.updateMenuItem(restaurantId, itemId, {
         name,
         description,
@@ -251,14 +235,12 @@ export class RestaurantController {
         return;
       }
 
-      console.log(`✅ Menu item updated successfully: ${menuItem.id}`);
-
       res.json({
         success: true,
         menuItem,
       });
     } catch (error: any) {
-      console.error('❌ Error updating menu item:', error);
+      console.error('Error updating menu item:', error);
       res.status(500).json({
         success: false,
         error: error.message || 'Failed to update menu item',
@@ -276,8 +258,6 @@ export class RestaurantController {
       const itemId = parseInt(req.params.itemId);
       const { isAvailable } = req.body;
 
-      console.log(`🔄 Toggling availability for menu item ${itemId}: ${isAvailable}`);
-
       const menuItem = await restaurantService.toggleMenuItemAvailability(
         restaurantId,
         itemId,
@@ -292,14 +272,12 @@ export class RestaurantController {
         return;
       }
 
-      console.log(`✅ Menu item availability updated: ${menuItem.id}`);
-
       res.json({
         success: true,
         menuItem,
       });
     } catch (error: any) {
-      console.error('❌ Error toggling menu item availability:', error);
+      console.error('Error toggling menu item availability:', error);
       res.status(500).json({
         success: false,
         error: error.message || 'Failed to toggle menu item availability',
@@ -412,15 +390,13 @@ export class RestaurantController {
       const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 8080}`;
       const imageUrl = `${baseUrl}/uploads/menu-items/${req.file.filename}`;
 
-      console.log('✅ Image uploaded successfully:', imageUrl);
-
       res.json({
         success: true,
         imageUrl: imageUrl,
         filename: req.file.filename,
       });
     } catch (error: any) {
-      console.error('❌ Image upload error:', error);
+      console.error('Image upload error:', error);
       res.status(500).json({
         success: false,
         error: error.message || 'Failed to upload image',

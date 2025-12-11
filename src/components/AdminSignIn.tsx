@@ -62,7 +62,7 @@ export default function AdminSignIn({ onBack, onSignInSuccess }: AdminSignInProp
         return;
       }
 
-      console.log('✅ Admin authentication successful:', data);
+      console.log('Admin authentication successful:', data);
       setIsLoading(false);
       onSignInSuccess();
     } catch (error: any) {

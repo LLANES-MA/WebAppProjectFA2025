@@ -814,7 +814,6 @@ export default function RestaurantDashboard({ onBack, restaurantId, restaurantSt
         });
         
         setOperatingHours(hoursMap);
-        console.log('✅ Refreshed operating hours after save:', hoursMap);
       }
 
       // Show success message
@@ -1652,7 +1651,7 @@ export default function RestaurantDashboard({ onBack, restaurantId, restaurantSt
                   
                   <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
                     <p className="text-sm text-blue-400">
-                      💡 Tip: Keep your operating hours updated so customers know when they can order from you. These changes will be reflected immediately on your restaurant page.
+                      Keep your operating hours updated so customers know when they can order from you. Changes are reflected immediately on your restaurant page.
                     </p>
                   </div>
                 </div>
@@ -1690,7 +1689,7 @@ export default function RestaurantDashboard({ onBack, restaurantId, restaurantSt
                       <div className="space-y-4 py-4">
                         <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
                           <p className="text-sm text-red-400 mb-3">
-                            ⚠️ <strong>Important Warning:</strong>
+                            <strong>Important Warning:</strong>
                           </p>
                           <ul className="text-sm text-red-400 space-y-2 list-disc list-inside">
                             <li>Your restaurant will be immediately removed from the FrontDash platform</li>

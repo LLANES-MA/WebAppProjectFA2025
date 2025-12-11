@@ -7,7 +7,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080
 const USE_BACKEND = import.meta.env.VITE_USE_BACKEND === 'true';
 
 // Debug logging
-console.log('🔍 RestaurantService Config:', {
+console.log('RestaurantService Config:', {
   API_BASE_URL,
   USE_BACKEND,
   env: import.meta.env.VITE_USE_BACKEND,
@@ -62,12 +62,11 @@ export interface RestaurantHours {
  */
 export async function getAllRestaurants(): Promise<Restaurant[]> {
   if (!USE_BACKEND) {
-    console.warn('⚠️ Backend not enabled, returning empty array');
+    console.warn('Backend not enabled, returning empty array');
     return [];
   }
 
   try {
-    console.log('📡 Fetching restaurants from:', `${API_BASE_URL}/restaurants`);
     const response = await fetch(`${API_BASE_URL}/restaurants`, {
       method: 'GET',
       headers: {
@@ -75,19 +74,16 @@ export async function getAllRestaurants(): Promise<Restaurant[]> {
       },
     });
 
-    console.log('📥 Response status:', response.status, response.statusText);
-
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('❌ API Error:', errorText);
+      console.error('API Error:', errorText);
       throw new Error(`Failed to fetch restaurants: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    console.log('✅ Received restaurants:', data.restaurants?.length || 0);
     return data.restaurants || [];
   } catch (error) {
-    console.error('❌ Error fetching restaurants:', error);
+    console.error('Error fetching restaurants:', error);
     throw error;
   }
 }
@@ -97,18 +93,16 @@ export async function getAllRestaurants(): Promise<Restaurant[]> {
  */
 export async function getApprovedRestaurants(): Promise<Restaurant[]> {
   if (!USE_BACKEND) {
-    console.warn('⚠️ Backend not enabled, returning empty array');
+    console.warn('Backend not enabled, returning empty array');
     return [];
   }
 
   try {
-    console.log('📡 Fetching approved restaurants from:', `${API_BASE_URL}/restaurants`);
     const restaurants = await getAllRestaurants();
     const approved = restaurants.filter(r => r.status === 'approved');
-    console.log('✅ Approved restaurants:', approved.length);
     return approved;
   } catch (error) {
-    console.error('❌ Error fetching approved restaurants:', error);
+    console.error('Error fetching approved restaurants:', error);
     return [];
   }
 }
@@ -122,7 +116,6 @@ export async function getRestaurantById(id: number): Promise<Restaurant | null> 
   }
 
   try {
-    console.log('📡 Fetching restaurant:', id);
     const response = await fetch(`${API_BASE_URL}/restaurants/${id}`, {
       method: 'GET',
       headers: {
@@ -154,7 +147,6 @@ export async function getRestaurantMenu(restaurantId: number): Promise<MenuItem[
   }
 
   try {
-    console.log('📡 Fetching menu for restaurant:', restaurantId);
     const response = await fetch(`${API_BASE_URL}/restaurants/${restaurantId}/menu`, {
       method: 'GET',
       headers: {
@@ -167,7 +159,6 @@ export async function getRestaurantMenu(restaurantId: number): Promise<MenuItem[
     }
 
     const data = await response.json();
-    console.log('✅ Menu items:', data.menuItems?.length || 0);
     return data.menuItems || [];
   } catch (error) {
     console.error('Error fetching menu:', error);
@@ -184,7 +175,6 @@ export async function getRestaurantHours(restaurantId: number): Promise<Restaura
   }
 
   try {
-    console.log('📡 Fetching hours for restaurant:', restaurantId);
     const response = await fetch(`${API_BASE_URL}/restaurants/${restaurantId}/hours`, {
       method: 'GET',
       headers: {
@@ -213,7 +203,6 @@ export async function getPendingRestaurants(): Promise<Restaurant[]> {
   }
 
   try {
-    console.log('📡 Fetching pending restaurants');
     const response = await fetch(`${API_BASE_URL}/admin/restaurants/pending`, {
       method: 'GET',
       headers: {

@@ -14,10 +14,8 @@ export class AdminController {
   async approveRestaurant(req: Request, res: Response): Promise<void> {
     try {
       const restaurantId = parseInt(req.params.id);
-      console.log(`📝 Approval request received for restaurant ID: ${restaurantId}`);
 
       if (isNaN(restaurantId)) {
-        console.error('❌ Invalid restaurant ID:', req.params.id);
         res.status(400).json({
           success: false,
           error: 'Invalid restaurant ID',
@@ -25,19 +23,9 @@ export class AdminController {
         return;
       }
 
-      // TODO: Add admin authentication middleware
-      // const adminToken = req.headers.authorization;
-      // if (!isAdmin(adminToken)) {
-      //   res.status(403).json({ success: false, error: 'Unauthorized' });
-      //   return;
-      // }
-
-      console.log(`🔍 Calling adminService.approveRestaurant(${restaurantId})...`);
       const result = await adminService.approveRestaurant(restaurantId);
-      console.log(`📋 Approval result:`, { success: result.success, error: result.error });
 
       if (!result.success) {
-        console.error(`❌ Approval failed: ${result.error}`);
         res.status(400).json({
           success: false,
           error: result.error || 'Failed to approve restaurant',
@@ -46,7 +34,6 @@ export class AdminController {
         return;
       }
 
-      console.log(`✅ Restaurant ${restaurantId} approved successfully`);
       res.json({
         success: true,
         restaurantId: result.restaurantId,
@@ -55,8 +42,7 @@ export class AdminController {
         message: 'Restaurant approved successfully',
       });
     } catch (error: any) {
-      console.error('❌ Approval error:', error);
-      console.error('Error stack:', error.stack);
+      console.error('Approval error:', error);
       res.status(500).json({
         success: false,
         error: error.message || 'Failed to approve restaurant',

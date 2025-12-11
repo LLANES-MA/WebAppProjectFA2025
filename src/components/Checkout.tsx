@@ -233,8 +233,6 @@ export default function Checkout({ cartItems, total, onBack, onOrderComplete, on
         })),
       };
       
-      console.log('📝 Creating order:', orderData);
-      
       const response = await fetch(`${API_BASE_URL}/orders`, {
         method: 'POST',
         headers: {
@@ -249,12 +247,11 @@ export default function Checkout({ cartItems, total, onBack, onOrderComplete, on
       }
       
       const result = await response.json();
-      console.log('✅ Order created successfully:', result);
       
       setIsProcessing(false);
       onOrderComplete();
     } catch (err: any) {
-      console.error('❌ Error creating order:', err);
+      console.error('Error creating order:', err);
       setIsProcessing(false);
       alert('Failed to place order: ' + err.message);
     }

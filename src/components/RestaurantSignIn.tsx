@@ -121,16 +121,10 @@ export default function RestaurantSignIn({ onBack, onSignInSuccess, onAccountCre
         return;
       }
 
-      // Authentication successful
-      console.log('✅ Restaurant authentication successful:', data);
-      console.log('📝 Storing restaurantId:', data.restaurantId);
-      
-      // Store restaurant ID in localStorage for dashboard access
       if (data.restaurantId) {
         localStorage.setItem('restaurantId', data.restaurantId.toString());
-        console.log('✅ restaurantId stored in localStorage:', localStorage.getItem('restaurantId'));
       } else {
-        console.error('❌ No restaurantId in response:', data);
+        console.error('No restaurantId in response:', data);
       }
       
       setIsLoading(false);
@@ -447,7 +441,7 @@ export default function RestaurantSignIn({ onBack, onSignInSuccess, onAccountCre
 
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
                   <p className="text-sm text-blue-400">
-                    🔐 A secure 9-character password will be automatically generated for your account.
+                    A secure 9-character password will be automatically generated for your account.
                   </p>
                 </div>
 

@@ -27,13 +27,9 @@ export class AdminService {
    * - Sends approval email with credentials
    */
   async approveRestaurant(restaurantId: number): Promise<ApprovalResult> {
-    console.log(`🔍 AdminService.approveRestaurant(${restaurantId}) called`);
-    
-    // Get restaurant
-    console.log(`📡 Fetching restaurant ${restaurantId}...`);
     const restaurant = await restaurantService.getRestaurant(restaurantId);
     if (!restaurant) {
-      console.error(`❌ Restaurant with ID ${restaurantId} not found`);
+      console.error(`Restaurant with ID ${restaurantId} not found`);
       return {
         success: false,
         restaurantId,
@@ -43,16 +39,8 @@ export class AdminService {
       };
     }
 
-    console.log(`✅ Restaurant found:`, {
-      id: restaurant.id,
-      name: restaurant.restaurantName,
-      email: restaurant.email,
-      status: restaurant.status
-    });
-
-    // Check if already approved
     if (restaurant.status === 'approved') {
-      console.warn(`⚠️ Restaurant ${restaurantId} is already approved`);
+      console.warn(`Restaurant ${restaurantId} is already approved`);
       return {
         success: false,
         restaurantId,
@@ -63,12 +51,8 @@ export class AdminService {
     }
 
     try {
-      // Generate temporary password
       const temporaryPassword = authService.generateTemporaryPassword();
-      const username = restaurant.email; // Use email as username
-
-      console.log(`🔑 Generated temporary password: ${temporaryPassword}`);
-      console.log(`📧 Username (email): ${username}`);
+      const username = restaurant.email;
 
       if (!username || !restaurant.email) {
         return {
@@ -88,32 +72,15 @@ export class AdminService {
         });
       }
 
-      // Create login via AuthService with usertype='restaurant'
-      console.log(`🔐 Creating login for username: ${username}`);
-      console.log(`🔐 Password to hash: ${temporaryPassword}`);
       try {
-        const createdLogin = await authService.createLogin(username, temporaryPassword, 'restaurant');
-        console.log(`✅ Login created successfully`);
-        console.log(`📝 Created login details:`, {
-          username: createdLogin.username,
-          passwordHashLength: createdLogin.passwordHash.length,
-          passwordHashPreview: createdLogin.passwordHash.substring(0, 20) + '...'
-        });
+        await authService.createLogin(username, temporaryPassword, 'restaurant');
       } catch (error: any) {
-        console.error(`❌ Failed to create login:`, error);
-        // If login already exists, that's okay - continue with account creation
         if (error.message && error.message.includes('already exists')) {
-          console.log(`⚠️ Login already exists, continuing...`);
-          // Try to verify the existing password works
-          console.log(`🔍 Verifying existing login with provided password...`);
           const existingLogin = await db.getLogin(username);
           if (existingLogin) {
-            console.log(`📝 Existing login found, hash: ${existingLogin.passwordHash.substring(0, 20)}...`);
             const testAuth = await authService.authenticate(username, temporaryPassword);
-            console.log(`🔍 Test authentication with temporary password: ${testAuth}`);
             if (!testAuth) {
-              console.warn(`⚠️ WARNING: Existing login password does not match temporary password!`);
-              console.warn(`⚠️ The restaurant may need to use their original password, not the temporary one.`);
+              console.warn(`Existing login password does not match temporary password`);
             }
           }
         } else {
@@ -121,37 +88,27 @@ export class AdminService {
         }
       }
 
-      // Create RestaurantAccount linking Restaurant to Login
-      console.log(`🔗 Creating RestaurantAccount with restaurantId: ${restaurant.id}, username: ${username}`);
       try {
         const accountInput: RestaurantAccountCreateInput = {
           restaurantId: restaurant.id,
           username: username,
         };
         await db.createRestaurantAccount(accountInput);
-        console.log(`✅ RestaurantAccount created successfully`);
       } catch (error: any) {
-        console.error(`❌ Failed to create RestaurantAccount:`, error);
-        // If account already exists, that's okay - continue with status update
         if (error.message && (error.message.includes('already exists') || error.message.includes('Duplicate'))) {
-          console.log(`⚠️ RestaurantAccount already exists, continuing...`);
+          // Account already exists, continue
         } else {
           throw new Error(`Failed to create restaurant account: ${error.message || error}`);
         }
       }
 
-      // Update restaurant status to approved
-      // Database uses 'APPROVED' and sets is_active = 1
-      console.log(`📝 Updating restaurant status to APPROVED for restaurantId: ${restaurantId}`);
       try {
         await db.updateRestaurantStatus(restaurantId, 'APPROVED', true);
-        console.log(`✅ Restaurant status updated to APPROVED`);
       } catch (error: any) {
-        console.error(`❌ Failed to update restaurant status:`, error);
+        console.error(`Failed to update restaurant status:`, error);
         throw new Error(`Failed to update restaurant status: ${error.message || error}`);
       }
 
-      // Send approval email with credentials
       const loginUrl = process.env.FRONTEND_URL || 'http://localhost:3000/restaurant-signin';
       try {
         await emailService.sendApprovalEmail(
@@ -161,10 +118,8 @@ export class AdminService {
           temporaryPassword,
           loginUrl
         );
-        console.log(`✅ Approval email sent to ${restaurant.email}`);
       } catch (error) {
-        console.error(`❌ Failed to send approval email:`, error);
-        // Don't fail approval if email fails
+        console.error(`Failed to send approval email:`, error);
       }
 
       return {
@@ -174,7 +129,7 @@ export class AdminService {
         temporaryPassword,
       };
     } catch (error: any) {
-      console.error(`❌ Failed to approve restaurant ${restaurantId}:`, error);
+      console.error(`Failed to approve restaurant ${restaurantId}:`, error);
       return {
         success: false,
         restaurantId,
@@ -185,11 +140,6 @@ export class AdminService {
     }
   }
 
-  /**
-   * Reject a restaurant registration
-   * - Updates Restaurant status to 'rejected'
-   * - Sends rejection email to restaurant (non-blocking)
-   */
   async rejectRestaurant(restaurantId: number): Promise<boolean> {
     const restaurant = await restaurantService.getRestaurant(restaurantId);
     if (!restaurant) {
@@ -200,13 +150,10 @@ export class AdminService {
       status: 'rejected',
     });
 
-    // Send rejection email (non-blocking - don't fail rejection if email fails)
     try {
       await emailService.sendRejectionEmail(restaurant.email, restaurant.restaurantName);
-      console.log(`✅ Rejection email sent to ${restaurant.email}`);
     } catch (error: any) {
-      console.error(`❌ Failed to send rejection email:`, error?.message || error);
-      // Don't throw - rejection was successful, email failure is non-critical
+      console.error(`Failed to send rejection email:`, error?.message || error);
     }
 
     return true;

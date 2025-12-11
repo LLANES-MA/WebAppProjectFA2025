@@ -63,7 +63,7 @@ export default function StaffSignIn({ onBack, onSignInSuccess }: StaffSignInProp
         return;
       }
 
-      console.log('✅ Staff authentication successful:', data);
+      console.log('Staff authentication successful:', data);
       setIsLoading(false);
       onSignInSuccess();
     } catch (error: any) {

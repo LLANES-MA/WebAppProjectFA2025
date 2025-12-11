@@ -115,19 +115,9 @@ export default function AdminDashboard({
         return;
       }
 
-      console.log(`📝 Approving restaurant ${id}:`, {
-        id: restaurant.id,
-        name: restaurant.restaurantName || restaurant.name,
-        email: restaurant.email,
-      });
-
       const result = await approveRestaurant(id, restaurant.email, restaurant.restaurantName || restaurant.name);
       
       if (result.success) {
-        console.log('✅ Restaurant approved successfully');
-        console.log('📋 Menu items should already exist from registration');
-        
-        // Refresh the list
         const [pending, approved] = await Promise.all([
           getPendingRestaurants(),
           getApprovedRestaurants(),
@@ -141,11 +131,11 @@ export default function AdminDashboard({
         
         alert(`Restaurant approved successfully!\n\nCredentials have been sent to ${restaurant.email}\n\nMenu items from registration have been preserved.`);
       } else {
-        console.error('❌ Approval failed:', result.error);
+        console.error('Approval failed:', result.error);
         alert(`Failed to approve restaurant: ${result.error || 'Unknown error'}\n\nPlease check the console for more details.`);
       }
     } catch (err: any) {
-      console.error('❌ Error approving restaurant:', err);
+      console.error('Error approving restaurant:', err);
       console.error('Error details:', {
         message: err.message,
         stack: err.stack,
@@ -859,7 +849,7 @@ export default function AdminDashboard({
                               </div>
                             </div>
                             <p className="text-xs text-yellow-400 mt-2">
-                              ⚠️ Please save these credentials. The password cannot be retrieved later.
+                              Please save these credentials. The password cannot be retrieved later.
                             </p>
                           </div>
                         </div>

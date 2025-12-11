@@ -648,7 +648,7 @@ export default function RestaurantRegistration({ onComplete, onBack, initialAcco
 
                 <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
                   <p className="text-sm text-blue-400">
-                    💡 Tip: Set accurate hours so customers know when they can order from you. You can always update these later in your dashboard.
+                    Set accurate hours so customers know when they can order from you. You can update these later in your dashboard.
                   </p>
                 </div>
                 {errors.operatingHours && (

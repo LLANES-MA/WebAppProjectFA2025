@@ -96,11 +96,10 @@ async function sendEmail(options: EmailOptions): Promise<void> {
       }
       
       const result = await response.json();
-      console.log('✅ Email sent successfully:', result);
+      console.log('Email sent successfully:', result);
     } catch (error) {
-      console.error('❌ Failed to send email via API:', error);
-      // Fallback to console logging in development
-      console.log('📧 Email (fallback):', {
+      console.error('Failed to send email via API:', error);
+      console.log('Email (fallback):', {
         to: options.to,
         subject: options.subject,
         body: options.body,
@@ -109,8 +108,7 @@ async function sendEmail(options: EmailOptions): Promise<void> {
       throw error;
     }
   } else {
-    // Development mode: log to console
-    console.log('📧 Email Sent (dev mode):', {
+    console.log('Email Sent (dev mode):', {
       to: options.to,
       subject: options.subject,
       body: options.body,
@@ -129,28 +127,18 @@ export async function registerRestaurant(
   const useBackend = import.meta.env.VITE_USE_BACKEND === 'true';
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
   
-  console.log('📡 Registration request:', {
-    useBackend,
-    apiBaseUrl,
-    restaurantName: registrationData.restaurantName,
-  });
-  
   if (useBackend) {
     try {
-      console.log('📡 Calling backend:', `${apiBaseUrl}/restaurants/register`);
-      
-      // First check if backend is reachable
       try {
         const healthCheck = await fetch(`${apiBaseUrl.replace('/api', '')}/health`, {
           method: 'GET',
-          signal: AbortSignal.timeout(5000), // 5 second timeout
+          signal: AbortSignal.timeout(5000),
         });
         if (!healthCheck.ok) {
           throw new Error(`Backend health check failed: ${healthCheck.status}`);
         }
-        console.log('✅ Backend is reachable');
       } catch (healthError: any) {
-        console.error('❌ Backend health check failed:', healthError);
+        console.error('Backend health check failed:', healthError);
         return {
           success: false,
           error: 'Cannot connect to backend server. Please ensure the backend is running on http://localhost:8080'
@@ -166,10 +154,8 @@ export async function registerRestaurant(
           ...registrationData,
           status: 'pending'
         }),
-        signal: AbortSignal.timeout(30000), // 30 second timeout
+        signal: AbortSignal.timeout(30000),
       });
-
-      console.log('📡 Response status:', response.status, response.statusText);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -180,7 +166,7 @@ export async function registerRestaurant(
           errorData = { message: errorText || `Registration failed with status ${response.status}` };
         }
         const errorMessage = errorData.message || errorData.error || `Registration failed with status ${response.status}`;
-        console.error('❌ Backend error:', errorMessage);
+        console.error('Backend error:', errorMessage);
         return {
           success: false,
           error: errorMessage
@@ -188,17 +174,13 @@ export async function registerRestaurant(
       }
 
       const result = await response.json();
-      console.log('✅ Restaurant registered successfully:', result);
-      
-      // Backend RestaurantService should automatically trigger pending approval email
-      // via the Email/NotificationService
       
       return {
         success: true,
         restaurantId: result.restaurantId || result.id
       };
     } catch (error: any) {
-      console.error('❌ Failed to register restaurant:', error);
+      console.error('Failed to register restaurant:', error);
       console.error('Error details:', {
         message: error.message,
         name: error.name,
@@ -260,37 +242,28 @@ export async function approveRestaurant(
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
         const errorMessage = errorData.error || errorData.message || `Approval failed with status ${response.status}`;
-        console.error('❌ Approval API error:', errorData);
+        console.error('Approval API error:', errorData);
         throw new Error(errorMessage);
       }
 
       const result = await response.json();
-      console.log('✅ Restaurant approved successfully:', result);
-      
-      // Backend AdminService should:
-      // 1. Update Restaurant status to 'approved'
-      // 2. Create Login entry via AuthService
-      // 3. Create RestaurantAccount linking Restaurant to Login
-      // 4. Generate temporary password
-      // 5. Trigger approval email via Email/NotificationService with credentials
       
       return {
         success: true,
         credentials: {
           username: result.username || restaurantEmail,
-          password: result.temporaryPassword || '***' // Backend generates this
+          password: result.temporaryPassword || '***'
         }
       };
     } catch (error: any) {
-      console.error('❌ Failed to approve restaurant:', error);
+      console.error('Failed to approve restaurant:', error);
       return {
         success: false,
         error: error.message || 'Failed to approve restaurant'
       };
     }
   } else {
-    // Development mode: simulate approval
-    console.log('✅ Restaurant Approval (dev mode):', { restaurantId, restaurantEmail, restaurantName });
+    console.log('Restaurant Approval (dev mode):', { restaurantId, restaurantEmail, restaurantName });
     
     // Generate credentials manually in dev mode
     const temporaryPassword = generateTemporaryPassword();

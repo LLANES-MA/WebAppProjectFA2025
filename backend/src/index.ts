@@ -68,10 +68,10 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`\n🎉 FrontDash Backend API Server running!`);
-  console.log(`📍 Server: http://localhost:${PORT}`);
-  console.log(`📡 API Base: http://localhost:${PORT}/api`);
-  console.log(`🌐 CORS Origin: ${CORS_ORIGIN}`);
-  console.log(`📧 Email Service: ${process.env.EMAIL_USER ? '✅ Configured' : '⚠️  Not configured (dev mode)'}\n`);
+  console.log(`\nFrontDash Backend API Server running!`);
+  console.log(`Server: http://localhost:${PORT}`);
+  console.log(`API Base: http://localhost:${PORT}/api`);
+  console.log(`CORS Origin: ${CORS_ORIGIN}`);
+  console.log(`Email Service: ${process.env.EMAIL_USER ? 'Configured' : 'Not configured (dev mode)'}\n`);
 });
 

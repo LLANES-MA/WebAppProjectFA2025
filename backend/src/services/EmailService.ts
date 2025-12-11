@@ -34,9 +34,9 @@ export class EmailService {
       });
 
       this.enabled = true;
-      console.log('✅ Email service initialized');
+      console.log('Email service initialized');
     } else {
-      console.warn('⚠️  Email service not configured. Emails will be logged to console only.');
+      console.warn('Email service not configured. Emails will be logged to console only.');
       this.enabled = false;
     }
   }
@@ -46,8 +46,7 @@ export class EmailService {
    */
   async sendEmail(options: EmailOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
     if (!this.enabled || !this.transporter) {
-      // Log email to console in development mode
-      console.log('📧 Email (dev mode):', {
+      console.log('Email (dev mode):', {
         to: options.to,
         subject: options.subject,
         body: options.body.substring(0, 100) + '...',
@@ -69,14 +68,14 @@ export class EmailService {
       };
 
       const info = await this.transporter.sendMail(mailOptions);
-      console.log('✅ Email sent successfully:', info.messageId);
+      console.log('Email sent successfully:', info.messageId);
       
       return {
         success: true,
         messageId: info.messageId,
       };
     } catch (error: any) {
-      console.error('❌ Failed to send email:', error);
+      console.error('Failed to send email:', error);
       return {
         success: false,
         error: error.message || 'Failed to send email',

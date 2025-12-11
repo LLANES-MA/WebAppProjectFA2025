@@ -49,9 +49,6 @@ export class RestaurantService {
    */
   async registerRestaurant(data: RestaurantRegistrationData): Promise<Restaurant> {
     try {
-      console.log('📝 Creating restaurant:', data.restaurantName);
-      
-      // Create restaurant input
       const restaurantInput: RestaurantCreateInput = {
         restaurantName: data.restaurantName,
         description: data.description || '',
@@ -70,17 +67,10 @@ export class RestaurantService {
         preparationTime: parseInt(data.preparationTime) || 30,
         status: 'pending',
       };
-      
 
-      // Create restaurant
-      console.log('📝 Creating restaurant entry...');
-      // Pass contactPerson separately since it's not in RestaurantCreateInput
       const contactPerson = data.contactPerson || data.email;
       const restaurant = await db.createRestaurant(restaurantInput, contactPerson);
-      console.log('✅ Restaurant created:', restaurant.id);
 
-      // Create restaurant hours
-      console.log('📝 Creating restaurant hours...');
       const daysOfWeek: Array<keyof typeof data.operatingHours> = [
         'monday',
         'tuesday',
@@ -94,9 +84,7 @@ export class RestaurantService {
       for (const day of daysOfWeek) {
         const hours = data.operatingHours?.[day];
         if (hours) {
-          // Skip if closed or if no times provided
           if (hours.closed || (!hours.open && !hours.close)) {
-            console.log(`⏭️  Skipping ${day} (closed or no times)`);
             continue;
           }
           
@@ -106,20 +94,16 @@ export class RestaurantService {
               dayOfWeek: day as RestaurantHours['dayOfWeek'],
               openTime: hours.open || '09:00',
               closeTime: hours.close || '17:00',
-              isClosed: false, // Only create entries for open days
+              isClosed: false,
             };
             await db.createRestaurantHours(hoursInput);
-            console.log(`✅ Created hours for ${day}`);
           } catch (error: any) {
-            console.error(`❌ Failed to create hours for ${day}:`, error.message);
-            // Continue with other days even if one fails
+            console.error(`Failed to create hours for ${day}:`, error.message);
           }
         }
       }
 
-      // Create menu items if provided
       if (data.menuItems && data.menuItems.length > 0) {
-        console.log('📝 Creating menu items...');
         for (const item of data.menuItems) {
           if (item.name && item.price) {
             try {
@@ -134,28 +118,22 @@ export class RestaurantService {
               };
               await db.createMenuItem(menuItemInput);
             } catch (error: any) {
-              console.error(`❌ Failed to create menu item ${item.name}:`, error.message);
-              // Continue with other items even if one fails
+              console.error(`Failed to create menu item ${item.name}:`, error.message);
             }
           }
         }
       }
 
-      // Send pending approval email (non-blocking - don't fail registration if email fails)
       try {
         await emailService.sendPendingApprovalEmail(restaurant.email, restaurant.restaurantName);
-        console.log(`✅ Pending approval email sent to ${restaurant.email}`);
       } catch (error: any) {
-        console.error(`❌ Failed to send pending approval email:`, error?.message || error);
-        // Don't fail registration if email fails - email is optional
+        console.error(`Failed to send pending approval email:`, error?.message || error);
       }
 
-      console.log('✅ Restaurant registration complete:', restaurant.id);
       return restaurant;
     } catch (error: any) {
-      console.error('❌ Error in registerRestaurant:', error);
-      console.error('Error stack:', error.stack);
-      throw error; // Re-throw to be caught by controller
+      console.error('Error in registerRestaurant:', error);
+      throw error;
     }
   }
 
