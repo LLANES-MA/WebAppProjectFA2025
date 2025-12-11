@@ -71,8 +71,8 @@ mysql -h localhost -u root -p FrontDash
    npm run dev
    ```
 3. Check for connection message:
-   - ✅ `Connected to MySQL database: FrontDash` = Success!
-   - ❌ `Error connecting to MySQL database:` = Check configuration
+   - `Connected to MySQL database: FrontDash` = Success!
+   - `Error connecting to MySQL database:` = Check configuration
 
 ## Quick Configuration Script
 

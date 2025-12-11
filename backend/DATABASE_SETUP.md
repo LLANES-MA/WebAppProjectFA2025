@@ -75,8 +75,8 @@ npm run dev
 ```
 
 You should see:
-- `✅ Connected to MySQL database: FrontDash` if the connection is successful
-- `❌ Error connecting to MySQL database:` if there's a connection issue
+- `Connected to MySQL database: FrontDash` if the connection is successful
+- `Error connecting to MySQL database:` if there's a connection issue
 
 ## Troubleshooting
 

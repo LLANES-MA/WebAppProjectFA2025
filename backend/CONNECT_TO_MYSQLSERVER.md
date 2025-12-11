@@ -83,8 +83,8 @@ npm run dev
 ```
 
 Look for:
-- ✅ `Connected to MySQL database: FrontDash` = Success!
-- ❌ `Error connecting to MySQL database:` = Check configuration
+- `Connected to MySQL database: FrontDash` = Success!
+- `Error connecting to MySQL database:` = Check configuration
 
 ## Quick Test Script
 

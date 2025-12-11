@@ -10,9 +10,9 @@ Should return JSON with restaurants from database.
 
 ### 2. Check Frontend Configuration
 Open browser console (F12) and look for:
-- `🔍 RestaurantService Config:` - Shows API URL and backend enabled status
-- `📡 Fetching restaurants from:` - Shows API calls being made
-- `✅ Received restaurants:` - Shows data received
+- `RestaurantService Config:` - Shows API URL and backend enabled status
+- `Fetching restaurants from:` - Shows API calls being made
+- `Received restaurants:` - Shows data received
 
 ### 3. Verify .env Files
 
@@ -69,11 +69,11 @@ Should return restaurants from database.
 ## Troubleshooting
 
 ### If no data appears:
-1. ✅ Check backend is running: `curl http://localhost:8080/health`
-2. ✅ Check database has data: `mysql -h Inzwis-MacBook-Air.local -u root FrontDash -e "SELECT * FROM restaurants;"`
-3. ✅ Check frontend .env has `VITE_USE_BACKEND=true`
-4. ✅ Restart frontend to pick up .env changes
-5. ✅ Check browser console for errors
+1. Check backend is running: `curl http://localhost:8080/health`
+2. Check database has data: `mysql -h Inzwis-MacBook-Air.local -u root FrontDash -e "SELECT * FROM restaurants;"`
+3. Check frontend .env has `VITE_USE_BACKEND=true`
+4. Restart frontend to pick up .env changes
+5. Check browser console for errors
 
 ### Common Issues:
 - **CORS errors**: Backend CORS is configured for `http://localhost:3000`

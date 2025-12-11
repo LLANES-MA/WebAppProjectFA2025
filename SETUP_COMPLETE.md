@@ -1,51 +1,51 @@
-# ✅ FrontDash Full Stack Setup Complete
+# FrontDash Full Stack Setup Complete
 
-## 🎉 Everything is Connected and Running!
+## Everything is Connected and Running!
 
 ### Database → Backend → Frontend Workflow
 
 All components are successfully connected and tested:
 
-1. **✅ MySQL Database** - Connected and operational
+1. **MySQL Database** - Connected and operational
    - Database: `FrontDash`
    - Host: `localhost:3306`
    - All tables created successfully
 
-2. **✅ Backend API Server** - Running and connected to database
+2. **Backend API Server** - Running and connected to database
    - URL: `http://localhost:8080`
    - API Base: `http://localhost:8080/api`
-   - Database connection: ✅ Active
+   - Database connection: Active
    - CORS: Configured for `http://localhost:3000`
 
-3. **✅ Frontend Application** - Running and connected to backend
+3. **Frontend Application** - Running and connected to backend
    - URL: `http://localhost:3000`
    - Backend API: `http://localhost:8080/api`
-   - Backend integration: ✅ Enabled (`VITE_USE_BACKEND=true`)
+   - Backend integration: Enabled (`VITE_USE_BACKEND=true`)
 
-## 🧪 Tested Workflow
+## Tested Workflow
 
-### Restaurant Registration Flow ✅
+### Restaurant Registration Flow
 1. **Register Restaurant** → `POST /api/restaurants/register`
-   - ✅ Successfully created restaurant in database
-   - ✅ Status set to "pending"
-   - ✅ Restaurant hours saved
-   - ✅ Returns restaurant ID
+   - Successfully created restaurant in database
+   - Status set to "pending"
+   - Restaurant hours saved
+   - Returns restaurant ID
 
 2. **View Pending Restaurants** → `GET /api/admin/restaurants/pending`
-   - ✅ Returns list of pending restaurants
-   - ✅ Includes all restaurant details
+   - Returns list of pending restaurants
+   - Includes all restaurant details
 
 3. **Approve Restaurant** → `POST /api/admin/restaurants/{id}/approve`
-   - ✅ Updates status to "approved"
-   - ✅ Creates login credentials
-   - ✅ Generates temporary password
-   - ✅ Links restaurant to login account
+   - Updates status to "approved"
+   - Creates login credentials
+   - Generates temporary password
+   - Links restaurant to login account
 
 4. **View Approved Restaurants** → `GET /api/admin/restaurants/approved`
-   - ✅ Returns approved restaurants
-   - ✅ Status correctly updated
+   - Returns approved restaurants
+   - Status correctly updated
 
-## 📋 Running Services
+## Running Services
 
 ### Backend Server
 ```bash
@@ -62,7 +62,7 @@ npm run dev
 - Running on: `http://localhost:3000`
 - Auto-opens in browser
 
-## 🔧 Configuration Files
+## Configuration Files
 
 ### Backend `.env` (backend/.env)
 ```env
@@ -81,16 +81,16 @@ VITE_USE_BACKEND=true
 VITE_API_BASE_URL=http://localhost:8080/api
 ```
 
-## 📊 Database Schema
+## Database Schema
 
 All tables created:
-- ✅ `logins` - User authentication
-- ✅ `restaurants` - Restaurant information
-- ✅ `restaurant_hours` - Operating hours
-- ✅ `menu_items` - Menu items
-- ✅ `restaurant_accounts` - Restaurant-login linking
+- `logins` - User authentication
+- `restaurants` - Restaurant information
+- `restaurant_hours` - Operating hours
+- `menu_items` - Menu items
+- `restaurant_accounts` - Restaurant-login linking
 
-## 🚀 API Endpoints Available
+## API Endpoints Available
 
 ### Restaurant Endpoints
 - `GET /api/restaurants` - Get all restaurants
@@ -108,7 +108,7 @@ All tables created:
 ### Notification Endpoints
 - `POST /api/notifications/email` - Send email
 
-## ✨ Next Steps
+## Next Steps
 
 1. **Access the Application**
    - Frontend: Open `http://localhost:3000` in your browser
@@ -125,7 +125,7 @@ All tables created:
    - Payment integration
    - Driver assignment
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Backend not connecting to database?
 - Check MySQL is running: `mysql -h localhost -u root -e "SHOW DATABASES;"`
@@ -141,7 +141,7 @@ All tables created:
 - Ensure all tables exist: `SHOW TABLES;` in `FrontDash` database
 - Run schema again if needed: `mysql -h localhost -u root FrontDash < backend/schema.sql`
 
-## 📝 Notes
+## Notes
 
 - Database uses `localhost` instead of `MySQLServer` (updated in `.env`)
 - Both servers are running in development mode
@@ -150,7 +150,7 @@ All tables created:
 
 ---
 
-**Status: ✅ FULLY OPERATIONAL**
+**Status: FULLY OPERATIONAL**
 
-All systems connected and tested successfully! 🎊
+All systems connected and tested successfully.
 
