@@ -169,6 +169,42 @@ The FrontDash Team
       body,
     });
   }
+
+  /**
+   * Send rejection email to restaurant
+   */
+  async sendRejectionEmail(email: string, restaurantName: string): Promise<void> {
+    const subject = 'Update on your FrontDash restaurant registration';
+    const body = `
+Dear ${restaurantName},
+
+Thank you for your interest in joining FrontDash.
+
+After careful review of your restaurant registration application, we regret to inform you that we are unable to approve your restaurant for our platform at this time.
+
+This decision may have been based on various factors including:
+- Business information verification
+- Platform capacity and market fit
+- Current operational requirements
+
+We understand this may be disappointing, and we appreciate the time you took to complete the registration process.
+
+If you believe this decision was made in error or if you have additional information you'd like to share, please feel free to contact our support team:
+- Email: support@frontdash.com
+- Phone: 1-800-FRONTDASH
+
+We wish you the best of luck with your restaurant business.
+
+Best regards,
+The FrontDash Team
+    `.trim();
+
+    await this.sendEmail({
+      to: email,
+      subject,
+      body,
+    });
+  }
 }
 
 // Singleton instance

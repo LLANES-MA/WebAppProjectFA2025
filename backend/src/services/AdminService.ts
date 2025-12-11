@@ -187,6 +187,8 @@ export class AdminService {
 
   /**
    * Reject a restaurant registration
+   * - Updates Restaurant status to 'rejected'
+   * - Sends rejection email to restaurant (non-blocking)
    */
   async rejectRestaurant(restaurantId: number): Promise<boolean> {
     const restaurant = await restaurantService.getRestaurant(restaurantId);
@@ -197,6 +199,15 @@ export class AdminService {
     await restaurantService.updateRestaurant(restaurantId, {
       status: 'rejected',
     });
+
+    // Send rejection email (non-blocking - don't fail rejection if email fails)
+    try {
+      await emailService.sendRejectionEmail(restaurant.email, restaurant.restaurantName);
+      console.log(`✅ Rejection email sent to ${restaurant.email}`);
+    } catch (error: any) {
+      console.error(`❌ Failed to send rejection email:`, error?.message || error);
+      // Don't throw - rejection was successful, email failure is non-critical
+    }
 
     return true;
   }

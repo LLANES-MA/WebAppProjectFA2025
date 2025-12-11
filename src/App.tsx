@@ -139,10 +139,37 @@ export default function App() {
     }
   };
 
-  const handleRejectRestaurant = (registrationId: number) => {
-    setPendingRegistrations(prev => 
-      prev.filter(reg => reg.id !== registrationId)
-    );
+  const handleRejectRestaurant = async (registrationId: number) => {
+    if (!confirm(`Are you sure you want to reject restaurant registration #${registrationId}?`)) {
+      return;
+    }
+
+    try {
+      const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8080/api';
+      const response = await fetch(`${API_BASE_URL}/admin/restaurants/${registrationId}/reject`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        alert(data.error || 'Failed to reject restaurant');
+        return;
+      }
+
+      // Remove from pending registrations after successful backend rejection
+      setPendingRegistrations(prev => 
+        prev.filter(reg => reg.id !== registrationId)
+      );
+      
+      alert('Restaurant has been rejected successfully');
+    } catch (err: any) {
+      console.error('Error rejecting restaurant:', err);
+      alert('Failed to reject restaurant: ' + err.message);
+    }
   };
 
   return (

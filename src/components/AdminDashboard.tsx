@@ -61,7 +61,7 @@ export default function AdminDashboard({
   const [passwordErrors, setPasswordErrors] = useState<{ [key: string]: string }>({});
   const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
   const [changingPassword, setChangingPassword] = useState(false);
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+  const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8080/api';
 
   // Fetch all data from API
   const fetchAllData = async () => {
@@ -226,10 +226,42 @@ export default function AdminDashboard({
     await handleApproveRestaurant(id);
   };
 
-  const handleRejectRegistration = (id: number) => {
-    console.log(`Rejected registration ${id}`);
-    if (onRejectRestaurant) {
-      onRejectRestaurant(id);
+  const handleRejectRegistration = async (id: number) => {
+    if (!confirm(`Are you sure you want to reject restaurant registration #${id}?`)) {
+      return;
+    }
+
+    try {
+      const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8080/api';
+      const response = await fetch(`${API_BASE_URL}/admin/restaurants/${id}/reject`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        alert(data.error || 'Failed to reject restaurant');
+        return;
+      }
+
+      // Remove from local pending registrations state immediately
+      setPendingRegistrations(prev => prev.filter(reg => reg.id !== id));
+      
+      // Also call the parent handler if provided (for App.tsx state sync)
+      if (onRejectRestaurant) {
+        onRejectRestaurant(id);
+      }
+      
+      // Refresh data to ensure consistency with backend
+      await fetchAllData();
+      
+      alert('Restaurant has been rejected successfully');
+    } catch (err: any) {
+      console.error('Error rejecting restaurant:', err);
+      alert('Failed to reject restaurant: ' + err.message);
     }
   };
 

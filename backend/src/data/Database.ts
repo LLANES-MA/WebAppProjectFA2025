@@ -20,9 +20,23 @@ class Database {
   // ==================== Restaurant Methods ====================
   
   async createRestaurant(input: RestaurantCreateInput, contactPerson?: string): Promise<Restaurant> {
+    // Validate required fields
+    if (!input.address) {
+      throw new Error('Address is required');
+    }
+    if (!input.city) {
+      throw new Error('City is required');
+    }
+    if (!input.state) {
+      throw new Error('State is required');
+    }
+    if (!input.zipCode) {
+      throw new Error('Zip code is required');
+    }
+    
     // First, create Address entry
     // Parse address string to extract building number and street name
-    const addressParts = input.address.split(/\s+/);
+    const addressParts = input.address.trim().split(/\s+/);
     const buildingNumber = addressParts[0] || '';
     const streetName = addressParts.slice(1).join(' ') || input.address;
     

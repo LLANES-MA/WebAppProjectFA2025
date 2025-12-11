@@ -138,6 +138,25 @@ export async function registerRestaurant(
   if (useBackend) {
     try {
       console.log('📡 Calling backend:', `${apiBaseUrl}/restaurants/register`);
+      
+      // First check if backend is reachable
+      try {
+        const healthCheck = await fetch(`${apiBaseUrl.replace('/api', '')}/health`, {
+          method: 'GET',
+          signal: AbortSignal.timeout(5000), // 5 second timeout
+        });
+        if (!healthCheck.ok) {
+          throw new Error(`Backend health check failed: ${healthCheck.status}`);
+        }
+        console.log('✅ Backend is reachable');
+      } catch (healthError: any) {
+        console.error('❌ Backend health check failed:', healthError);
+        return {
+          success: false,
+          error: 'Cannot connect to backend server. Please ensure the backend is running on http://localhost:8080'
+        };
+      }
+      
       const response = await fetch(`${apiBaseUrl}/restaurants/register`, {
         method: 'POST',
         headers: {
@@ -146,7 +165,8 @@ export async function registerRestaurant(
         body: JSON.stringify({
           ...registrationData,
           status: 'pending'
-        })
+        }),
+        signal: AbortSignal.timeout(30000), // 30 second timeout
       });
 
       console.log('📡 Response status:', response.status, response.statusText);
@@ -159,7 +179,12 @@ export async function registerRestaurant(
         } catch {
           errorData = { message: errorText || `Registration failed with status ${response.status}` };
         }
-        throw new Error(errorData.message || errorData.error || `Registration failed with status ${response.status}`);
+        const errorMessage = errorData.message || errorData.error || `Registration failed with status ${response.status}`;
+        console.error('❌ Backend error:', errorMessage);
+        return {
+          success: false,
+          error: errorMessage
+        };
       }
 
       const result = await response.json();
@@ -182,7 +207,9 @@ export async function registerRestaurant(
       
       // Provide more helpful error messages
       let errorMessage = error.message || 'Failed to register restaurant';
-      if (error.message === 'Failed to fetch' || error.name === 'TypeError') {
+      if (error.name === 'AbortError' || error.message === 'The operation was aborted') {
+        errorMessage = 'Request timed out. Please check your connection and try again.';
+      } else if (error.message === 'Failed to fetch' || error.name === 'TypeError') {
         errorMessage = 'Cannot connect to backend server. Please ensure the backend is running on http://localhost:8080';
       }
       
